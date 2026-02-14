@@ -9,7 +9,7 @@ import yfinance as yf
 
 
 def download_qqq_data(
-    start_date: str = "2011-01-01",
+    start_date: str = "1999-01-01",
     output_path: str = "data/raw/qqq_daily.csv",
 ) -> pd.DataFrame:
     """Download QQQ daily OHLCV data and save to CSV.
