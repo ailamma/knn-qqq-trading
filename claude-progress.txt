@@ -39,3 +39,19 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** F002 — Download auxiliary data (VIX, SPY, IWM, TLT, GLD)
 - **Blockers:** None
 - **Features completed:** 1 / 28
+
+### Session 2b — F002: Download Auxiliary Data (2026-02-14)
+- **What was done:**
+  - Created `data/download_auxiliary.py` — downloads VIX, SPY, IWM, TLT, GLD
+  - VIX: 6,821 rows from 1999-01-04
+  - SPY: 6,821 rows from 1999-01-04
+  - IWM: 6,468 rows from 2000-05-26
+  - TLT: 5,925 rows from 2002-07-30
+  - GLD: 5,343 rows from 2004-11-18
+  - No NaN values in any dataset
+  - Date alignment verified against QQQ (full overlap where dates exist)
+  - Forward-fill logic included for up to 3 days if needed
+- **Current state:** F001 + F002 complete. All raw data downloaded.
+- **Next step:** F003 — Create merged master dataset
+- **Blockers:** None — GLD starts late (2004) so master dataset will start from ~2004-11-18
+- **Features completed:** 2 / 28
