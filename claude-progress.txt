@@ -27,3 +27,15 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Start Phase 1 — Feature F001 (Download QQQ data)
 - **Blockers:** None
 - **Features completed:** 0 / 28
+
+### Session 2 — F001: Download QQQ Data (2026-02-14)
+- **What was done:**
+  - Created `data/download_qqq.py` — downloads QQQ daily OHLCV from 2011-01-01 via yfinance
+  - Downloaded 3,802 rows (2011-01-03 to 2026-02-13) to `data/raw/qqq_daily.csv`
+  - All 6 columns present: Open, High, Low, Close, Adj Close, Volume
+  - Verified: no NaN values, no gaps > 3 business days
+  - Marked F001 as passes: true in feature_list.json
+- **Current state:** F001 complete. Raw QQQ data ready.
+- **Next step:** F002 — Download auxiliary data (VIX, SPY, IWM, TLT, GLD)
+- **Blockers:** None
+- **Features completed:** 1 / 28
