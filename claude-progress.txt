@@ -1,0 +1,29 @@
+# KNN QQQ Trading Model — Progress Log
+
+## Project Summary
+KNN-based model trained exclusively on QQQ data to predict next-day direction.
+Predictions are translated into TQQQ/SQQQ position recommendations for a $50K account.
+Goal: consistent daily profit via EOD signal generation.
+
+## Architecture
+- **Training data**: QQQ + auxiliary (VIX, SPY, IWM, TLT, GLD) — NO TQQQ/SQQQ in training
+- **Model**: KNN classifier with walk-forward validation
+- **Output**: Daily JSON recommendation (buy TQQQ, buy SQQQ, or cash)
+- **Position sizing**: Confidence-scaled, max 50% of account per trade
+
+## Session Log
+
+### Session 1 — Project Initialization (2026-02-14)
+- **What was done:**
+  - Created full project directory structure
+  - Created feature_list.json with 28 features across 6 phases
+  - Created claude-progress.txt (this file)
+  - Created init.sh bootstrap script
+  - Created README.md with project documentation
+  - Created requirements.txt with all dependencies
+  - Created .gitignore
+  - Initialized git repository with initial commit
+- **Current state:** Project scaffolding complete. No code written yet.
+- **Next step:** Start Phase 1 — Feature F001 (Download QQQ data)
+- **Blockers:** None
+- **Features completed:** 0 / 28

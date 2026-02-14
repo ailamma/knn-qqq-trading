@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+.deps_installed
+data/raw/*.csv
+data/processed/*.csv
+models/trained/*.pkl
+backtesting/results/plots/*.png
+signals/daily_recommendations/*.json
+signals/journal/*.csv
+notebooks/.ipynb_checkpoints/
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!models/trained/.gitkeep
+!backtesting/results/plots/.gitkeep
+!signals/daily_recommendations/.gitkeep
+!signals/journal/.gitkeep

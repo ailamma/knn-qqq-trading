@@ -1,0 +1,489 @@
+{
+  "project": "KNN QQQ Trading Model",
+  "description": "KNN-based model trained on QQQ data to generate daily EOD recommendations for TQQQ/SQQQ position sizing. Target: consistent profit on $50K account.",
+  "constraints": [
+    "Training data: QQQ ONLY (no TQQQ/SQQQ data in model training)",
+    "TQQQ/SQQQ used ONLY for position sizing in final phase",
+    "Model predicts QQQ next-day direction/magnitude",
+    "Position sizing translates QQQ prediction to TQQQ/SQQQ share count",
+    "Account size: $50,000"
+  ],
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Data Pipeline",
+      "description": "Download, clean, and store QQQ historical data with all required auxiliary data (VIX, volume, sector ETFs)",
+      "features": [
+        {
+          "id": "F001",
+          "category": "data",
+          "description": "Download QQQ daily OHLCV data from 2011-01-01 to present using yfinance",
+          "steps": [
+            "Install yfinance and dependencies",
+            "Download QQQ daily data (Open, High, Low, Close, Adj Close, Volume)",
+            "Save raw data to data/raw/qqq_daily.csv",
+            "Verify data completeness (no gaps > 3 business days)",
+            "Log row count, date range, and any missing dates"
+          ],
+          "passes": false,
+          "priority": 1
+        },
+        {
+          "id": "F002",
+          "category": "data",
+          "description": "Download auxiliary data: VIX daily close, SPY, IWM, TLT, GLD for correlation features",
+          "steps": [
+            "Download ^VIX daily close from 2011-01-01 to present",
+            "Download SPY, IWM, TLT, GLD daily OHLCV",
+            "Save each to data/raw/{ticker}_daily.csv",
+            "Verify date alignment across all tickers",
+            "Handle any missing data via forward-fill (max 3 days)"
+          ],
+          "passes": false,
+          "priority": 1
+        },
+        {
+          "id": "F003",
+          "category": "data",
+          "description": "Create merged master dataset with aligned dates across all tickers",
+          "steps": [
+            "Inner-join all datasets on date",
+            "Verify no NaN values in merged dataset",
+            "Save to data/processed/master_daily.csv",
+            "Log final row count and date range",
+            "Create data validation report"
+          ],
+          "passes": false,
+          "priority": 1
+        },
+        {
+          "id": "F004",
+          "category": "data",
+          "description": "Compute target variable: QQQ next-day close-to-close return",
+          "steps": [
+            "Calculate daily returns: (Close[t+1] - Close[t]) / Close[t]",
+            "Shift returns by -1 to align 'tomorrow's return' with today's row",
+            "Create binary classification target: 1 if next_day_return > 0, else 0",
+            "Save targets to master dataset",
+            "Log class balance (% positive vs negative days)"
+          ],
+          "passes": false,
+          "priority": 1
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Feature Engineering",
+      "description": "Compute all technical, volatility, momentum, and cross-asset features from QQQ and auxiliary data",
+      "features": [
+        {
+          "id": "F005",
+          "category": "features",
+          "description": "Price-based features: daily return, multi-day cumulative returns, distance from moving averages",
+          "steps": [
+            "Daily return (close-to-close %)",
+            "5-day, 10-day, 20-day cumulative returns",
+            "Distance from 20-day SMA (as %)",
+            "Distance from 50-day SMA (as %)",
+            "Distance from 200-day SMA (as %)",
+            "High-Low range as % of close",
+            "Close position within day's range ((C-L)/(H-L))",
+            "Save all to features/price_features.csv",
+            "Verify no look-ahead bias in any calculation"
+          ],
+          "passes": false,
+          "priority": 2
+        },
+        {
+          "id": "F006",
+          "category": "features",
+          "description": "Momentum and oscillator features: RSI, MACD, ROC, stochastic",
+          "steps": [
+            "RSI(14) - Relative Strength Index",
+            "MACD line (12,26) and signal line (9)",
+            "MACD histogram",
+            "Rate of Change (ROC) 10-day and 20-day",
+            "Stochastic %K(14) and %D(3)",
+            "Williams %R(14)",
+            "Save all to features/momentum_features.csv",
+            "Verify no look-ahead bias"
+          ],
+          "passes": false,
+          "priority": 2
+        },
+        {
+          "id": "F007",
+          "category": "features",
+          "description": "Volatility features: VIX level, VIX changes, realized vol, Bollinger position",
+          "steps": [
+            "VIX daily close (level)",
+            "VIX 5-day change (%)",
+            "VIX 10-day change (%)",
+            "10-day realized volatility of QQQ (annualized)",
+            "20-day realized volatility of QQQ (annualized)",
+            "IV/RV ratio (VIX / 20-day realized vol)",
+            "Bollinger Band position: (Close - BB_lower) / (BB_upper - BB_lower)",
+            "Bollinger Band width: (BB_upper - BB_lower) / BB_mid",
+            "Save all to features/volatility_features.csv"
+          ],
+          "passes": false,
+          "priority": 2
+        },
+        {
+          "id": "F008",
+          "category": "features",
+          "description": "Volume features: volume ratio, OBV trend, volume-price divergence",
+          "steps": [
+            "Volume ratio: today's volume / 20-day avg volume",
+            "5-day volume trend (slope of linear regression on volume)",
+            "On-Balance Volume (OBV) 10-day rate of change",
+            "Volume-price divergence: sign(price_change) != sign(volume_change)",
+            "Save all to features/volume_features.csv"
+          ],
+          "passes": false,
+          "priority": 2
+        },
+        {
+          "id": "F009",
+          "category": "features",
+          "description": "Cross-asset features: relative strength vs SPY/IWM, bond/gold signals",
+          "steps": [
+            "QQQ/SPY relative strength (10-day ratio change)",
+            "QQQ/IWM relative strength (10-day ratio change)",
+            "TLT 5-day return (bond market signal)",
+            "GLD 5-day return (risk-off signal)",
+            "SPY-QQQ return spread (5-day)",
+            "Save all to features/cross_asset_features.csv"
+          ],
+          "passes": false,
+          "priority": 2
+        },
+        {
+          "id": "F010",
+          "category": "features",
+          "description": "Calendar features: day of week, month, options expiration proximity",
+          "steps": [
+            "Day of week (0-4, Monday-Friday)",
+            "Month (1-12)",
+            "Is monthly options expiration week (boolean)",
+            "Days since last FOMC meeting (approximate)",
+            "Save all to features/calendar_features.csv"
+          ],
+          "passes": false,
+          "priority": 3
+        },
+        {
+          "id": "F011",
+          "category": "features",
+          "description": "Merge all feature sets into single training-ready dataframe with no NaN rows",
+          "steps": [
+            "Merge all feature CSVs on date",
+            "Drop rows with any NaN (typically first 200 rows due to 200-day SMA)",
+            "Save to data/processed/features_master.csv",
+            "Log total features count, row count, date range",
+            "Generate feature correlation matrix heatmap",
+            "Save feature list/descriptions to features/feature_registry.json"
+          ],
+          "passes": false,
+          "priority": 2
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "KNN Model Development",
+      "description": "Build, tune, and validate the KNN classifier using walk-forward methodology",
+      "features": [
+        {
+          "id": "F012",
+          "category": "model",
+          "description": "Implement walk-forward train/test split infrastructure",
+          "steps": [
+            "Create WalkForwardSplitter class",
+            "Parameters: training_window (default 500 days), test_window (1 day)",
+            "Slides forward 1 day at a time",
+            "Verify no future data leakage: test date always > max(train dates)",
+            "Unit test with synthetic data",
+            "Save to models/walk_forward.py"
+          ],
+          "passes": false,
+          "priority": 3
+        },
+        {
+          "id": "F013",
+          "category": "model",
+          "description": "Build baseline KNN classifier with StandardScaler and basic features",
+          "steps": [
+            "Start with 5 features: daily_return, rsi_14, vix_close, volume_ratio, dist_from_sma20",
+            "StandardScaler normalization (fit on train only, transform test)",
+            "KNeighborsClassifier with K=10, distance-weighted",
+            "Walk-forward backtest over 2020-2025",
+            "Log accuracy, precision, recall, profit factor",
+            "Save model code to models/knn_model.py"
+          ],
+          "passes": false,
+          "priority": 3
+        },
+        {
+          "id": "F014",
+          "category": "model",
+          "description": "Hyperparameter tuning: optimize K, distance metric, weighting scheme",
+          "steps": [
+            "Grid search over K: [3, 5, 7, 10, 15, 20, 30, 50]",
+            "Distance metrics: [euclidean, manhattan, minkowski(p=3)]",
+            "Weighting: [uniform, distance]",
+            "Use TimeSeriesSplit (5-fold) for inner CV within training window",
+            "Select best params by Sharpe ratio (not accuracy)",
+            "Log all results to models/tuning_results.csv",
+            "Save best model config to models/best_config.json"
+          ],
+          "passes": false,
+          "priority": 3
+        },
+        {
+          "id": "F015",
+          "category": "model",
+          "description": "Feature selection: identify optimal feature subset to reduce curse of dimensionality",
+          "steps": [
+            "Forward feature selection (greedy, max 12 features)",
+            "Evaluate each candidate by walk-forward Sharpe ratio",
+            "Test with mutual information scores as pre-filter",
+            "Compare: all features vs top-8 vs top-12 vs manual-5",
+            "Save selected features to models/selected_features.json",
+            "Document rationale for final feature set"
+          ],
+          "passes": false,
+          "priority": 4
+        },
+        {
+          "id": "F016",
+          "category": "model",
+          "description": "Rolling window optimization: find optimal training window size",
+          "steps": [
+            "Test training windows: [250, 500, 750, 1000, 1500] days",
+            "Compare walk-forward Sharpe for each window",
+            "Test adaptive windowing: weight recent data more heavily",
+            "Select best window size",
+            "Save results to models/window_analysis.csv"
+          ],
+          "passes": false,
+          "priority": 4
+        },
+        {
+          "id": "F017",
+          "category": "model",
+          "description": "Confidence calibration: convert predict_proba to actionable confidence scores",
+          "steps": [
+            "Analyze predict_proba distribution across walk-forward test",
+            "Plot calibration curve (predicted prob vs actual frequency)",
+            "Identify optimal confidence thresholds for trade/no-trade",
+            "Test thresholds: [0.50, 0.52, 0.55, 0.58, 0.60]",
+            "Measure: win rate, trade frequency, and Sharpe at each threshold",
+            "Save calibration data to models/calibration.json"
+          ],
+          "passes": false,
+          "priority": 4
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Backtesting Engine",
+      "description": "Full walk-forward backtest with realistic trading simulation on QQQ returns",
+      "features": [
+        {
+          "id": "F018",
+          "category": "backtest",
+          "description": "Build backtesting engine that simulates daily EOD trading on QQQ returns",
+          "steps": [
+            "Create Backtester class in backtesting/engine.py",
+            "Input: daily predictions (direction + confidence) and actual QQQ returns",
+            "Track: daily P&L, cumulative return, equity curve",
+            "Include transaction costs: $0.01/share slippage estimate",
+            "Support configurable confidence threshold for trade entry",
+            "Output: full trade log with dates, signals, returns"
+          ],
+          "passes": false,
+          "priority": 5
+        },
+        {
+          "id": "F019",
+          "category": "backtest",
+          "description": "Compute comprehensive performance metrics",
+          "steps": [
+            "Total return (cumulative)",
+            "Annualized return",
+            "Sharpe ratio (annualized, risk-free = 4.0%)",
+            "Sortino ratio",
+            "Max drawdown (% and duration in days)",
+            "Win rate (% of profitable days)",
+            "Profit factor (gross profit / gross loss)",
+            "Average win / average loss ratio",
+            "Number of trades and trade frequency",
+            "Monthly return distribution",
+            "Save metrics to backtesting/results/metrics.json"
+          ],
+          "passes": false,
+          "priority": 5
+        },
+        {
+          "id": "F020",
+          "category": "backtest",
+          "description": "Generate backtest visualization plots",
+          "steps": [
+            "Equity curve plot (strategy vs buy-and-hold QQQ)",
+            "Monthly returns heatmap",
+            "Drawdown chart over time",
+            "Rolling 30-day Sharpe ratio",
+            "Signal distribution histogram (confidence scores)",
+            "Win rate by month and by VIX regime",
+            "Save all plots to backtesting/results/plots/",
+            "Generate HTML summary report"
+          ],
+          "passes": false,
+          "priority": 5
+        },
+        {
+          "id": "F021",
+          "category": "backtest",
+          "description": "Stress test: evaluate model during known crisis periods",
+          "steps": [
+            "COVID crash: Feb-April 2020",
+            "2022 bear market: Jan-Oct 2022",
+            "2023 banking crisis: March 2023",
+            "2024 Aug VIX spike (if in data)",
+            "Report metrics for each crisis period separately",
+            "Document max single-day loss in each period",
+            "Save to backtesting/results/stress_tests.json"
+          ],
+          "passes": false,
+          "priority": 5
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "name": "Position Sizing (TQQQ/SQQQ)",
+      "description": "Translate QQQ model predictions into TQQQ/SQQQ share recommendations for $50K account",
+      "features": [
+        {
+          "id": "F022",
+          "category": "sizing",
+          "description": "Build position sizing engine that converts QQQ predictions to TQQQ/SQQQ share counts",
+          "steps": [
+            "Create PositionSizer class in signals/position_sizer.py",
+            "Input: QQQ prediction (direction + confidence), account balance, current TQQQ/SQQQ prices",
+            "Confidence > threshold_bull → Buy TQQQ shares",
+            "Confidence < threshold_bear → Buy SQQQ shares",
+            "Between thresholds → Stay in cash (no trade)",
+            "Scale position size by confidence: higher confidence = larger position",
+            "Cap max position at 50% of account value",
+            "Output: {action: 'BUY', ticker: 'TQQQ', shares: N, confidence: X}"
+          ],
+          "passes": false,
+          "priority": 6
+        },
+        {
+          "id": "F023",
+          "category": "sizing",
+          "description": "Download TQQQ/SQQQ historical prices for position sizing backtest ONLY",
+          "steps": [
+            "Download TQQQ daily OHLCV from 2011 to present",
+            "Download SQQQ daily OHLCV from 2011 to present",
+            "Save to data/raw/tqqq_daily.csv and data/raw/sqqq_daily.csv",
+            "NOTE: This data is NEVER used in model training, only for sizing backtest",
+            "Verify date alignment with QQQ data"
+          ],
+          "passes": false,
+          "priority": 6
+        },
+        {
+          "id": "F024",
+          "category": "sizing",
+          "description": "Backtest full TQQQ/SQQQ strategy with position sizing on $50K account",
+          "steps": [
+            "Run walk-forward KNN model to get daily signals",
+            "Apply position sizer to get daily TQQQ/SQQQ trades",
+            "Simulate $50K account: track cash, positions, daily equity",
+            "Include realistic costs: slippage + implicit 3x leverage decay",
+            "Compute all metrics from F019 on TQQQ/SQQQ equity curve",
+            "Compare: model-traded vs buy-hold-TQQQ vs buy-hold-QQQ",
+            "Save full results to backtesting/results/tqqq_sqqq_backtest/"
+          ],
+          "passes": false,
+          "priority": 6
+        },
+        {
+          "id": "F025",
+          "category": "sizing",
+          "description": "Optimize position sizing parameters",
+          "steps": [
+            "Test confidence thresholds: bull [0.52-0.65], bear [0.35-0.48]",
+            "Test max position sizes: [25%, 33%, 50%, 75%, 100%] of account",
+            "Test scaling functions: linear, quadratic, step-function",
+            "Optimize for maximum Sharpe with max drawdown < 25%",
+            "Save optimal params to signals/sizing_config.json"
+          ],
+          "passes": false,
+          "priority": 6
+        }
+      ]
+    },
+    {
+      "phase": 6,
+      "name": "Daily Signal Generator",
+      "description": "Production-ready script that runs daily at EOD to generate next-day recommendation",
+      "features": [
+        {
+          "id": "F026",
+          "category": "signal",
+          "description": "Build daily signal generation script",
+          "steps": [
+            "Create signals/generate_daily_signal.py",
+            "Downloads latest QQQ + auxiliary data via yfinance",
+            "Computes all features for today",
+            "Loads trained KNN model (trained on rolling window ending yesterday)",
+            "Generates prediction: direction + confidence",
+            "Applies position sizer with current TQQQ/SQQQ prices",
+            "Outputs recommendation: {date, action, ticker, shares, confidence, model_details}",
+            "Saves to signals/daily_recommendations/YYYY-MM-DD.json",
+            "Prints human-readable summary to console"
+          ],
+          "passes": false,
+          "priority": 7
+        },
+        {
+          "id": "F027",
+          "category": "signal",
+          "description": "Build model retraining pipeline that updates daily",
+          "steps": [
+            "Create scripts/retrain_model.py",
+            "Downloads fresh data up to today",
+            "Recomputes features",
+            "Retrains KNN on rolling window ending today",
+            "Saves model artifact to models/trained/model_YYYY-MM-DD.pkl",
+            "Logs training metrics (window size, feature count, in-sample accuracy)",
+            "Can be triggered by generate_daily_signal.py or run independently"
+          ],
+          "passes": false,
+          "priority": 7
+        },
+        {
+          "id": "F028",
+          "category": "signal",
+          "description": "Create trade journal / recommendation log tracker",
+          "steps": [
+            "Create signals/trade_journal.csv with columns: date, signal, ticker, shares, confidence, actual_return, pnl",
+            "After each trading day, update with actual results",
+            "Track running P&L and compare to model predictions",
+            "Generate weekly summary stats",
+            "Save to signals/journal/"
+          ],
+          "passes": false,
+          "priority": 7
+        }
+      ]
+    }
+  ]
+}
