@@ -1,0 +1,9 @@
+{
+  "k": 7,
+  "metric": "manhattan",
+  "weights": "uniform",
+  "sharpe_ratio": 0.6456,
+  "accuracy": 0.5325,
+  "annual_return": 0.1871,
+  "max_drawdown": -0.4875
+}

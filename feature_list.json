@@ -238,7 +238,7 @@
             "Log all results to models/tuning_results.csv",
             "Save best model config to models/best_config.json"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 3
         },
         {

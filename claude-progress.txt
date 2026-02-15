@@ -129,3 +129,14 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** F014 — Hyperparameter tuning (K, distance metric, weighting)
 - **Blockers:** None
 - **Features completed:** 13 / 28
+
+### Session 2i — F014: Hyperparameter Tuning (2026-02-15)
+- **What was done:**
+  - Grid search: 8 K values × 3 metrics × 2 weights = 48 combinations
+  - Best config: K=7, manhattan distance, uniform weights
+  - Best Sharpe: 0.646, accuracy 53.3%, annual return 18.7%
+  - Saved tuning_results.csv and best_config.json
+- **Current state:** F014 complete. Best hyperparams identified.
+- **Next step:** F015 — Feature selection
+- **Blockers:** None
+- **Features completed:** 14 / 28
