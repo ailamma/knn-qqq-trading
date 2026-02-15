@@ -92,3 +92,15 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** F006 — Momentum and oscillator features
 - **Blockers:** None
 - **Features completed:** 5 / 28
+
+### Session 2f — F006-F009: Feature Engineering Batch (2026-02-15)
+- **What was done:**
+  - F006: 9 momentum features (RSI, MACD line/signal/hist, ROC 10/20, Stoch K/D, Williams %R)
+  - F007: 8 volatility features (VIX close/changes, realized vol 10/20d, IV/RV ratio, BB position/width)
+  - F008: 4 volume features (volume ratio, 5d trend, OBV ROC, vol-price divergence)
+  - F009: 5 cross-asset features (QQQ/SPY RS, QQQ/IWM RS, TLT 5d ret, GLD 5d ret, SPY-QQQ spread)
+  - Total: 26 features across 4 feature modules
+- **Current state:** F005-F009 complete. Calendar features (F010) and merge (F011) remain in Phase 2.
+- **Next step:** F010 — Calendar features, then F011 — Merge all features
+- **Blockers:** None
+- **Features completed:** 9 / 28

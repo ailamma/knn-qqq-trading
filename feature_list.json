@@ -109,7 +109,7 @@
             "Save all to features/momentum_features.csv",
             "Verify no look-ahead bias"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 2
         },
         {
@@ -127,7 +127,7 @@
             "Bollinger Band width: (BB_upper - BB_lower) / BB_mid",
             "Save all to features/volatility_features.csv"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 2
         },
         {
@@ -141,7 +141,7 @@
             "Volume-price divergence: sign(price_change) != sign(volume_change)",
             "Save all to features/volume_features.csv"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 2
         },
         {
@@ -156,7 +156,7 @@
             "SPY-QQQ return spread (5-day)",
             "Save all to features/cross_asset_features.csv"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 2
         },
         {
