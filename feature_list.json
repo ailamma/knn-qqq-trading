@@ -92,7 +92,7 @@
             "Save all to features/price_features.csv",
             "Verify no look-ahead bias in any calculation"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 2
         },
         {

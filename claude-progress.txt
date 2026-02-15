@@ -80,3 +80,15 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Phase 2, F005 — Price-based features
 - **Blockers:** None
 - **Features completed:** 4 / 28
+
+### Session 2e — F005: Price-Based Features (2026-02-15)
+- **What was done:**
+  - Created `features/price_features.py` — 9 price-based features
+  - Features: daily_return, 5/10/20d cumulative returns, dist from SMA 20/50/200, HL range %, close position
+  - All use only data available at close on day T (no look-ahead)
+  - NaN counts as expected from rolling windows (max 199 for SMA200)
+  - Saved to `features/price_features.csv`
+- **Current state:** F005 complete. Starting Phase 2 feature engineering.
+- **Next step:** F006 — Momentum and oscillator features
+- **Blockers:** None
+- **Features completed:** 5 / 28
