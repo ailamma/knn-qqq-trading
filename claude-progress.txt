@@ -67,3 +67,16 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** F004 — Compute target variable (next-day return + binary classification)
 - **Blockers:** None
 - **Features completed:** 3 / 28
+
+### Session 2d — F004: Compute Target Variable (2026-02-15)
+- **What was done:**
+  - Created `data/compute_target.py` — computes next-day return and binary target
+  - Added columns: daily_return, next_day_return, target (binary: 1=up, 0=down)
+  - shift(-1) used correctly to avoid look-ahead bias
+  - Class balance: 55.2% positive, 44.8% negative (slight bull bias)
+  - Mean daily return: +0.061%, std: 1.36%
+  - Final master dataset: 5,341 rows, 39 columns
+- **Current state:** Phase 1 (Data Pipeline) COMPLETE. F001-F004 all pass.
+- **Next step:** Phase 2, F005 — Price-based features
+- **Blockers:** None
+- **Features completed:** 4 / 28

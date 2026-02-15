@@ -67,7 +67,7 @@
             "Save targets to master dataset",
             "Log class balance (% positive vs negative days)"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 1
         }
       ]
