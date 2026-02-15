@@ -170,7 +170,7 @@
             "Days since last FOMC meeting (approximate)",
             "Save all to features/calendar_features.csv"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 3
         },
         {
@@ -185,7 +185,7 @@
             "Generate feature correlation matrix heatmap",
             "Save feature list/descriptions to features/feature_registry.json"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 2
         }
       ]

@@ -104,3 +104,16 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** F010 — Calendar features, then F011 — Merge all features
 - **Blockers:** None
 - **Features completed:** 9 / 28
+
+### Session 2g — F010-F011: Calendar Features + Feature Merge (2026-02-15)
+- **What was done:**
+  - F010: 4 calendar features (day of week, month, opex week, days since FOMC)
+  - F011: Merged all 39 features into `data/processed/features_master.csv`
+  - 5,142 clean rows (2005-09-06 to 2026-02-12), zero NaN
+  - Generated correlation heatmap and feature registry JSON
+  - Identified 12 highly correlated pairs (|r|>0.9) — expected, will be handled in feature selection
+  - Target class balance: 55.3% positive
+- **Current state:** Phase 2 (Feature Engineering) COMPLETE. All features computed and merged.
+- **Next step:** Phase 3, F012 — Walk-forward train/test split infrastructure
+- **Blockers:** None
+- **Features completed:** 11 / 28
