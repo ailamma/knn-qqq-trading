@@ -117,3 +117,15 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Phase 3, F012 — Walk-forward train/test split infrastructure
 - **Blockers:** None
 - **Features completed:** 11 / 28
+
+### Session 2h — F012-F013: Walk-Forward Splitter + Baseline KNN (2026-02-15)
+- **What was done:**
+  - F012: WalkForwardSplitter class with 9 unit tests (all pass)
+  - F013: Baseline KNN classifier (K=10, distance-weighted, 5 features)
+  - Walk-forward backtest 2020-2025: 54.9% accuracy, 0.63 Sharpe, 18.2% annual return
+  - Max drawdown -56% (no confidence threshold yet)
+  - Profit factor 1.15, precision 57.9%, recall 71.2%
+- **Current state:** F012-F013 complete. Baseline model established.
+- **Next step:** F014 — Hyperparameter tuning (K, distance metric, weighting)
+- **Blockers:** None
+- **Features completed:** 13 / 28

@@ -207,7 +207,7 @@
             "Unit test with synthetic data",
             "Save to models/walk_forward.py"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 3
         },
         {
@@ -222,7 +222,7 @@
             "Log accuracy, precision, recall, profit factor",
             "Save model code to models/knn_model.py"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 3
         },
         {
