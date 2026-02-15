@@ -55,3 +55,15 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** F003 — Create merged master dataset
 - **Blockers:** None — GLD starts late (2004) so master dataset will start from ~2004-11-18
 - **Features completed:** 2 / 28
+
+### Session 2c — F003: Merge Master Dataset (2026-02-14)
+- **What was done:**
+  - Created `data/merge_master.py` — inner-joins all 6 tickers on date
+  - Master dataset: 5,343 rows, 36 columns, 2004-11-18 to 2026-02-13
+  - QQQ columns unprefixed, auxiliary prefixed (VIX_, SPY_, IWM_, TLT_, GLD_)
+  - Zero NaN values after inner join
+  - Saved to `data/processed/master_daily.csv`
+- **Current state:** F001-F003 complete. Clean master dataset ready.
+- **Next step:** F004 — Compute target variable (next-day return + binary classification)
+- **Blockers:** None
+- **Features completed:** 3 / 28

@@ -53,7 +53,7 @@
             "Log final row count and date range",
             "Create data validation report"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 1
         },
         {
