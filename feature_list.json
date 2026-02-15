@@ -253,7 +253,7 @@
             "Save selected features to models/selected_features.json",
             "Document rationale for final feature set"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 4
         },
         {
@@ -267,7 +267,7 @@
             "Select best window size",
             "Save results to models/window_analysis.csv"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 4
         },
         {
@@ -282,7 +282,7 @@
             "Measure: win rate, trade frequency, and Sharpe at each threshold",
             "Save calibration data to models/calibration.json"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 4
         }
       ]

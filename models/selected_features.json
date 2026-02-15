@@ -1,0 +1,308 @@
+{
+  "selected_features": [
+    "feat_macd_hist",
+    "feat_close_position",
+    "feat_return_5d",
+    "feat_stoch_k",
+    "feat_daily_return",
+    "feat_rsi_14",
+    "feat_stoch_d",
+    "feat_williams_r",
+    "feat_obv_roc_10d",
+    "feat_roc_10",
+    "feat_vix_close",
+    "feat_realized_vol_10d"
+  ],
+  "top_8": [
+    "feat_macd_hist",
+    "feat_close_position",
+    "feat_return_5d",
+    "feat_stoch_k",
+    "feat_daily_return",
+    "feat_rsi_14",
+    "feat_stoch_d",
+    "feat_williams_r"
+  ],
+  "top_12": [
+    "feat_macd_hist",
+    "feat_close_position",
+    "feat_return_5d",
+    "feat_stoch_k",
+    "feat_daily_return",
+    "feat_rsi_14",
+    "feat_stoch_d",
+    "feat_williams_r",
+    "feat_obv_roc_10d",
+    "feat_roc_10",
+    "feat_vix_close",
+    "feat_realized_vol_10d"
+  ],
+  "selection_log": [
+    {
+      "step": 1,
+      "feature_added": "feat_macd_hist",
+      "n_features": 1,
+      "sharpe_ratio": 0.8534,
+      "accuracy": 0.5464,
+      "annual_return": 0.2507,
+      "max_drawdown": -0.3302
+    },
+    {
+      "step": 2,
+      "feature_added": "feat_close_position",
+      "n_features": 2,
+      "sharpe_ratio": 0.4668,
+      "accuracy": 0.5192,
+      "annual_return": 0.1345,
+      "max_drawdown": -0.3169
+    },
+    {
+      "step": 3,
+      "feature_added": "feat_return_5d",
+      "n_features": 3,
+      "sharpe_ratio": 1.2678,
+      "accuracy": 0.5411,
+      "annual_return": 0.3883,
+      "max_drawdown": -0.2615
+    },
+    {
+      "step": 4,
+      "feature_added": "feat_stoch_k",
+      "n_features": 4,
+      "sharpe_ratio": 0.9834,
+      "accuracy": 0.5351,
+      "annual_return": 0.2926,
+      "max_drawdown": -0.3059
+    },
+    {
+      "step": 5,
+      "feature_added": "feat_daily_return",
+      "n_features": 5,
+      "sharpe_ratio": 0.8197,
+      "accuracy": 0.5318,
+      "annual_return": 0.2403,
+      "max_drawdown": -0.2637
+    },
+    {
+      "step": 6,
+      "feature_added": "feat_rsi_14",
+      "n_features": 6,
+      "sharpe_ratio": 0.9577,
+      "accuracy": 0.5345,
+      "annual_return": 0.2843,
+      "max_drawdown": -0.2957
+    },
+    {
+      "step": 7,
+      "feature_added": "feat_stoch_d",
+      "n_features": 7,
+      "sharpe_ratio": 0.8918,
+      "accuracy": 0.5378,
+      "annual_return": 0.2631,
+      "max_drawdown": -0.3162
+    },
+    {
+      "step": 8,
+      "feature_added": "feat_williams_r",
+      "n_features": 8,
+      "sharpe_ratio": 0.9349,
+      "accuracy": 0.5385,
+      "annual_return": 0.2769,
+      "max_drawdown": -0.4068
+    },
+    {
+      "step": 9,
+      "feature_added": "feat_obv_roc_10d",
+      "n_features": 9,
+      "sharpe_ratio": 1.0252,
+      "accuracy": 0.5391,
+      "annual_return": 0.3062,
+      "max_drawdown": -0.2948
+    },
+    {
+      "step": 10,
+      "feature_added": "feat_roc_10",
+      "n_features": 10,
+      "sharpe_ratio": 0.6513,
+      "accuracy": 0.5405,
+      "annual_return": 0.1886,
+      "max_drawdown": -0.2563
+    },
+    {
+      "step": 11,
+      "feature_added": "feat_vix_close",
+      "n_features": 11,
+      "sharpe_ratio": 0.4283,
+      "accuracy": 0.5272,
+      "annual_return": 0.1235,
+      "max_drawdown": -0.3378
+    },
+    {
+      "step": 12,
+      "feature_added": "feat_realized_vol_10d",
+      "n_features": 12,
+      "sharpe_ratio": 0.4387,
+      "accuracy": 0.5259,
+      "annual_return": 0.1264,
+      "max_drawdown": -0.4019
+    }
+  ],
+  "mi_ranking": [
+    {
+      "feature": "feat_rsi_14",
+      "mi_score": 0.007935921781821342
+    },
+    {
+      "feature": "feat_stoch_k",
+      "mi_score": 0.006914944810628931
+    },
+    {
+      "feature": "feat_williams_r",
+      "mi_score": 0.006268642495185439
+    },
+    {
+      "feature": "feat_month",
+      "mi_score": 0.005234628220354143
+    },
+    {
+      "feature": "feat_return_5d",
+      "mi_score": 0.004062823534112692
+    },
+    {
+      "feature": "feat_stoch_d",
+      "mi_score": 0.003954339806532481
+    },
+    {
+      "feature": "feat_macd_hist",
+      "mi_score": 0.0035392978857298196
+    },
+    {
+      "feature": "feat_close_position",
+      "mi_score": 0.0033500319919466115
+    },
+    {
+      "feature": "feat_tlt_return_5d",
+      "mi_score": 0.003236325379242011
+    },
+    {
+      "feature": "feat_realized_vol_10d",
+      "mi_score": 0.0030061191662733577
+    },
+    {
+      "feature": "feat_is_opex_week",
+      "mi_score": 0.002953086735823618
+    },
+    {
+      "feature": "feat_days_since_fomc",
+      "mi_score": 0.0026498362725706492
+    },
+    {
+      "feature": "feat_daily_return",
+      "mi_score": 0.002288231542221464
+    },
+    {
+      "feature": "feat_dist_sma50",
+      "mi_score": 0.0014614534161943027
+    },
+    {
+      "feature": "feat_vix_close",
+      "mi_score": 0.001435729166248123
+    },
+    {
+      "feature": "feat_dist_sma200",
+      "mi_score": 0.001144784460714643
+    },
+    {
+      "feature": "feat_roc_10",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_obv_roc_10d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_return_10d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_return_20d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_day_of_week",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_spy_qqq_spread_5d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_gld_return_5d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_dist_sma20",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_qqq_iwm_rs_10d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_qqq_spy_rs_10d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_vol_price_divergence",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_volume_ratio",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_volume_trend_5d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_roc_20",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_bb_width",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_bb_position",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_iv_rv_ratio",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_realized_vol_20d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_vix_change_10d",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_hl_range_pct",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_macd_line",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_macd_signal",
+      "mi_score": 0.0
+    },
+    {
+      "feature": "feat_vix_change_5d",
+      "mi_score": 0.0
+    }
+  ]
+}

@@ -5,5 +5,17 @@
   "sharpe_ratio": 0.6456,
   "accuracy": 0.5325,
   "annual_return": 0.1871,
-  "max_drawdown": -0.4875
+  "max_drawdown": -0.4875,
+  "training_window": 750,
+  "features": [
+    "feat_macd_hist",
+    "feat_close_position",
+    "feat_return_5d",
+    "feat_stoch_k",
+    "feat_daily_return",
+    "feat_rsi_14",
+    "feat_stoch_d",
+    "feat_williams_r"
+  ],
+  "confidence_threshold": 0.58
 }

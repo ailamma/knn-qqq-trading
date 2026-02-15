@@ -1,0 +1,82 @@
+{
+  "confidence_analysis": {
+    "prob_mean": 0.5621447517999242,
+    "prob_std": 0.18567057609016496,
+    "prob_min": 0.0,
+    "prob_max": 1.0,
+    "calibration_bins": [
+      {
+        "bin": "0.40-0.45",
+        "bin_center": 0.42499999999999993,
+        "predicted_prob": 0.4285714285714285,
+        "actual_freq": 0.5431034482758621,
+        "count": 348
+      },
+      {
+        "bin": "0.55-0.60",
+        "bin_center": 0.575,
+        "predicted_prob": 0.5714285714285713,
+        "actual_freq": 0.579064587973274,
+        "count": 449
+      }
+    ]
+  },
+  "threshold_results": [
+    {
+      "threshold": 0.5,
+      "n_trades": 1508,
+      "trade_frequency": 1.0,
+      "win_rate": 0.5431,
+      "sharpe_ratio": 1.5093,
+      "annual_return": 0.4748,
+      "total_return": 9.2265,
+      "max_drawdown": -0.3109,
+      "profit_factor": 1.3524
+    },
+    {
+      "threshold": 0.52,
+      "n_trades": 1508,
+      "trade_frequency": 1.0,
+      "win_rate": 0.5431,
+      "sharpe_ratio": 1.5093,
+      "annual_return": 0.4748,
+      "total_return": 9.2265,
+      "max_drawdown": -0.3109,
+      "profit_factor": 1.3524
+    },
+    {
+      "threshold": 0.55,
+      "n_trades": 1508,
+      "trade_frequency": 1.0,
+      "win_rate": 0.5431,
+      "sharpe_ratio": 1.5093,
+      "annual_return": 0.4748,
+      "total_return": 9.2265,
+      "max_drawdown": -0.3109,
+      "profit_factor": 1.3524
+    },
+    {
+      "threshold": 0.58,
+      "n_trades": 711,
+      "trade_frequency": 0.4715,
+      "win_rate": 0.5626,
+      "sharpe_ratio": 1.5369,
+      "annual_return": 0.1977,
+      "total_return": 1.9439,
+      "max_drawdown": -0.2792,
+      "profit_factor": 1.3509
+    },
+    {
+      "threshold": 0.6,
+      "n_trades": 711,
+      "trade_frequency": 0.4715,
+      "win_rate": 0.5626,
+      "sharpe_ratio": 1.5369,
+      "annual_return": 0.1977,
+      "total_return": 1.9439,
+      "max_drawdown": -0.2792,
+      "profit_factor": 1.3509
+    }
+  ],
+  "optimal_threshold": 0.58
+}

@@ -140,3 +140,15 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** F015 — Feature selection
 - **Blockers:** None
 - **Features completed:** 14 / 28
+
+### Session 2j — F015-F017: Feature Selection, Window Opt, Calibration (2026-02-15)
+- **What was done:**
+  - F015: Forward feature selection — top 8 features (Sharpe 0.93) beat manual 5 (0.65) and all 39 (0.22)
+    - Selected: macd_hist, close_position, return_5d, stoch_k, daily_return, rsi_14, stoch_d, williams_r
+  - F016: Window optimization — 750 days best (Sharpe 1.51, 47.5% annual, -31% maxDD)
+  - F017: Confidence calibration — threshold 0.58 optimal (Sharpe 1.54, trade 47% of days, -28% maxDD)
+- **Current state:** Phase 3 (KNN Model Development) COMPLETE.
+- **Best model config:** K=7, manhattan, uniform, window=750, 8 features, threshold=0.58
+- **Next step:** Phase 4, F018 — Backtesting engine
+- **Blockers:** None
+- **Features completed:** 17 / 28
