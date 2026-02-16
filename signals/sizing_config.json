@@ -10,6 +10,6 @@
     [0.15, -200],
     [0.00, -300]
   ],
-  "vol_target_multiple": 2.0,
+  "vol_target_multiple": 1.0,
   "note": "All decisions based on QQQ model predictions. TQQQ/SQQQ prices used only for share count calculation. Leverage via TQQQ/SQQQ + cash allocation. Vol targeting caps leverage when realized vol is high."
 }

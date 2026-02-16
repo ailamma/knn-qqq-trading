@@ -223,3 +223,17 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Address bullish bias — regime detection, trend-following features, asymmetric thresholds
 - **Blockers:** None
 - **Features completed:** 28 / 28
+
+### Session 3c — Regime Features & Trend Overlay Experiments (2026-02-16)
+- **What was done:**
+  - Created 4 regime features: above_sma200 (binary), golden_cross (binary), ADX(14), days_below_sma200
+  - Added regime_features.py, updated merge pipeline and daily signal generator
+  - **Regime features as KNN inputs: FAILED.** Curse of dimensionality — adding binary/categorical regime features to 8 continuous oscillators fractured the neighbor search. All combos produced negative Sharpe. Forward selection also rejected all 4 regime features.
+  - **Regime overlay (4 modes): marginal benefit.** Tested light/moderate/aggressive/symmetric overlays that cap leverage based on trend state. With 1.0x vol targeting, overlays are redundant (vol target already caps at +/-100%). With 2.0x, overlays hurt bear P&L by also capping correct bounce calls.
+  - **Key finding: 1.0x vol targeting is the optimal solution.** It reduces leverage proportionally via volatility rather than binary regime rules. Sharpe 1.18, -31.4% max DD, profitable in ALL regimes.
+  - Applied 1.0x vol target as production default across position_sizer, backtest, daily signal
+  - Production backtest: $50K → $291K, 34% annual, 1.18 Sharpe, -31.4% max DD
+- **Current state:** Production config finalized. 1.0x vol targeting. Regime overlay available but not active.
+- **Next step:** TBD — discuss further improvements
+- **Blockers:** None
+- **Features completed:** 28 / 28

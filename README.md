@@ -91,16 +91,22 @@ knn-qqq-trading/
 
 | Metric | Strategy (1.0x vol) | QQQ Buy & Hold | TQQQ Buy & Hold |
 |--------|---------------------|----------------|-----------------|
-| Total Return | 482% | 184% | 364% |
+| Total Return | 478% | 184% | 364% |
 | Annual Return | 34.0% | 19.0% | — |
 | Sharpe Ratio | 1.18 | — | — |
+| Sortino Ratio | 1.85 | — | — |
 | Max Drawdown | -31.4% | -35.6% | — |
+| Win Rate | 53.1% | — | — |
+| Starting Capital | $50,000 | — | — |
+| Ending Capital | $290,836 | — | — |
 
 ### Known Limitation: Bullish Bias in Bear Markets
 
 The model has a structural bullish bias — it predicts QQQ "up" ~62% of days regardless of regime. During the 2022 bear market (QQQ -29%), it was still LONG 62% of the time with LONG accuracy at only 45.8%. This is the primary driver of drawdowns. Short trades actually work well (52% win rate, profitable), but the model doesn't go short often enough.
 
 Root cause: KNN learns the historical base rate (QQQ up 55% of days) and the selected features (RSI, MACD, stochastics) are mean-reverting oscillators that signal "buy" after selloffs.
+
+Mitigated by 1.0x vol targeting which caps leverage at +/-100% during volatile periods, reducing max DD from -55% to -31%. Regime overlay (trend-following rules) tested but provided no incremental benefit over vol targeting alone.
 
 See [backtesting/results/BACKTEST_FINDINGS.md](backtesting/results/BACKTEST_FINDINGS.md) for full analysis.
 

@@ -30,6 +30,8 @@ ALL_FEATURES = [
     "feat_tlt_return_5d", "feat_gld_return_5d", "feat_spy_qqq_spread_5d",
     # Calendar features
     "feat_day_of_week", "feat_month", "feat_is_opex_week", "feat_days_since_fomc",
+    # Regime features
+    "feat_above_sma200", "feat_golden_cross", "feat_adx_14", "feat_days_below_sma200",
 ]
 
 # Manual baseline (from F013)

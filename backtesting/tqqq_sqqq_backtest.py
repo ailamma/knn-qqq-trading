@@ -158,7 +158,7 @@ if __name__ == "__main__":
 
     # Run TQQQ/SQQQ backtest with discrete leverage + vol targeting
     print("\nRunning TQQQ/SQQQ backtest (7 leverage levels, vol targeting)...")
-    sizer = PositionSizer(vol_target_multiple=2.0)
+    sizer = PositionSizer(vol_target_multiple=1.0)
     trade_log = run_tqqq_sqqq_backtest(predictions, tqqq, sqqq, sizer, features_df=df)
 
     # Compute metrics

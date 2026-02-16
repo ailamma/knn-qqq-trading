@@ -17,6 +17,7 @@ FEATURE_FILES = [
     "volume_features.csv",
     "cross_asset_features.csv",
     "calendar_features.csv",
+    "regime_features.csv",
 ]
 
 

@@ -21,6 +21,7 @@ from features.volatility_features import compute_volatility_features
 from features.volume_features import compute_volume_features
 from features.cross_asset_features import compute_cross_asset_features
 from features.calendar_features import compute_calendar_features
+from features.regime_features import compute_regime_features
 from signals.position_sizer import PositionSizer, LEVERAGE_LEVELS
 
 
@@ -85,6 +86,7 @@ def compute_all_features(df: pd.DataFrame) -> pd.DataFrame:
     df = compute_volume_features(df)
     df = compute_cross_asset_features(df)
     df = compute_calendar_features(df)
+    df = compute_regime_features(df)
     return df
 
 
@@ -166,7 +168,7 @@ def generate_signal(
         realized_vol = float(today_row[vol_col])
 
     # Position sizing with discrete leverage levels + vol targeting
-    sizer = PositionSizer(vol_target_multiple=2.0)
+    sizer = PositionSizer(vol_target_multiple=1.0)
     recommendation = sizer.size(
         prob_up, account_balance, tqqq_price, sqqq_price,
         realized_vol_annual=realized_vol,

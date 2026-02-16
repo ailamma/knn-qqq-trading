@@ -1,5 +1,5 @@
 {
-  "total_features": 39,
+  "total_features": 43,
   "total_rows": 4860,
   "date_range": {
     "start": "2006-10-18",
@@ -278,6 +278,34 @@
       "std": 13.532276,
       "min": 0.0,
       "max": 49.0
+    },
+    {
+      "name": "feat_above_sma200",
+      "mean": 0.804115,
+      "std": 0.396921,
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "name": "feat_golden_cross",
+      "mean": 0.794239,
+      "std": 0.404298,
+      "min": 0.0,
+      "max": 1.0
+    },
+    {
+      "name": "feat_adx_14",
+      "mean": 23.236392,
+      "std": 8.38982,
+      "min": 6.910708,
+      "max": 56.81019
+    },
+    {
+      "name": "feat_days_below_sma200",
+      "mean": 6.054321,
+      "std": 15.990322,
+      "min": 0.0,
+      "max": 60.0
     }
   ]
 }

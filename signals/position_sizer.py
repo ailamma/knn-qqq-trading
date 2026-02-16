@@ -60,7 +60,7 @@ class PositionSizer:
     def __init__(
         self,
         thresholds: list[tuple[float, int]] | None = None,
-        vol_target_multiple: float | None = 2.0,
+        vol_target_multiple: float | None = 1.0,
     ) -> None:
         self.thresholds = thresholds or DEFAULT_THRESHOLDS
         self.vol_target_multiple = vol_target_multiple
