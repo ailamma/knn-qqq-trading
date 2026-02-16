@@ -1,0 +1,58 @@
+{
+  "COVID Crash (Feb-Apr 2020)": {
+    "trading_days": 51,
+    "strategy_return": 0.1695,
+    "qqq_buy_hold_return": -0.1023,
+    "outperformance": 0.2718,
+    "max_drawdown": -0.0917,
+    "worst_day_return": -0.0917,
+    "worst_day_date": "2020-03-11",
+    "win_rate": 0.5556,
+    "n_traded": 18,
+    "n_long": 15,
+    "n_short": 3,
+    "n_cash": 33
+  },
+  "2022 Bear Market (Jan-Oct 2022)": {
+    "trading_days": 209,
+    "strategy_return": 0.1712,
+    "qqq_buy_hold_return": -0.3151,
+    "outperformance": 0.4863,
+    "max_drawdown": -0.2012,
+    "worst_day_return": -0.0406,
+    "worst_day_date": "2022-02-02",
+    "win_rate": 0.4896,
+    "n_traded": 96,
+    "n_long": 61,
+    "n_short": 35,
+    "n_cash": 113
+  },
+  "2023 Banking Crisis (Mar 2023)": {
+    "trading_days": 23,
+    "strategy_return": 0.0092,
+    "qqq_buy_hold_return": 0.0994,
+    "outperformance": -0.0903,
+    "max_drawdown": -0.0207,
+    "worst_day_return": -0.0207,
+    "worst_day_date": "2023-03-02",
+    "win_rate": 0.625,
+    "n_traded": 8,
+    "n_long": 4,
+    "n_short": 4,
+    "n_cash": 15
+  },
+  "2024 Aug VIX Spike": {
+    "trading_days": 24,
+    "strategy_return": -0.0928,
+    "qqq_buy_hold_return": -0.0426,
+    "outperformance": -0.0502,
+    "max_drawdown": -0.094,
+    "worst_day_return": -0.0359,
+    "worst_day_date": "2024-07-23",
+    "win_rate": 0.4444,
+    "n_traded": 9,
+    "n_long": 6,
+    "n_short": 3,
+    "n_cash": 15
+  }
+}

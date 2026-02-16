@@ -152,3 +152,14 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Phase 4, F018 — Backtesting engine
 - **Blockers:** None
 - **Features completed:** 17 / 28
+
+### Session 2k — F018-F021: Backtesting Engine (2026-02-15)
+- **What was done:**
+  - F018: Backtester class — $50K→$144.6K over 6 years, 34% long, 13% short, 53% cash
+  - F019: Full metrics — 19.2% annual, 0.91 Sharpe, 1.30 Sortino, -28% maxDD, 56.3% win rate
+  - F020: 6 plots (equity curve, monthly heatmap, drawdown, rolling Sharpe, signals, regime) + HTML report
+  - F021: Stress tests — COVID: +17% vs QQQ -10%; 2022 bear: +17% vs QQQ -31.5%
+- **Current state:** Phase 4 (Backtesting Engine) COMPLETE.
+- **Next step:** Phase 5, F022 — Position sizing engine (TQQQ/SQQQ)
+- **Blockers:** None
+- **Features completed:** 21 / 28

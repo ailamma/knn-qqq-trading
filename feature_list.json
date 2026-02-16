@@ -304,7 +304,7 @@
             "Support configurable confidence threshold for trade entry",
             "Output: full trade log with dates, signals, returns"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 5
         },
         {
@@ -324,7 +324,7 @@
             "Monthly return distribution",
             "Save metrics to backtesting/results/metrics.json"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 5
         },
         {
@@ -341,7 +341,7 @@
             "Save all plots to backtesting/results/plots/",
             "Generate HTML summary report"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 5
         },
         {
@@ -357,7 +357,7 @@
             "Document max single-day loss in each period",
             "Save to backtesting/results/stress_tests.json"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 5
         }
       ]
