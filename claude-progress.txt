@@ -163,3 +163,16 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Phase 5, F022 — Position sizing engine (TQQQ/SQQQ)
 - **Blockers:** None
 - **Features completed:** 21 / 28
+
+### Session 2l — F022-F025: Position Sizing (TQQQ/SQQQ) (2026-02-15)
+- **What was done:**
+  - F022: PositionSizer class with linear/quadratic/step scaling
+  - F023: Downloaded TQQQ/SQQQ data (4,027 rows each from 2010)
+  - F024: Full TQQQ/SQQQ backtest — $50K→$90.3K, 10.4% annual, -18.5% maxDD
+  - F025: Sizing optimization (75 combos) — best: threshold 0.55, 33% max, step scaling
+    - Sharpe 0.83, 13.5% annual, -19.2% maxDD (within 25% constraint)
+- **Current state:** Phase 5 (Position Sizing) COMPLETE.
+- **Optimal sizing:** bull_threshold=0.55, max_position=33%, step scaling
+- **Next step:** Phase 6, F026 — Daily signal generation script
+- **Blockers:** None
+- **Features completed:** 25 / 28

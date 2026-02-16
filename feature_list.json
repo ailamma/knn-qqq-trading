@@ -381,7 +381,7 @@
             "Cap max position at 50% of account value",
             "Output: {action: 'BUY', ticker: 'TQQQ', shares: N, confidence: X}"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 6
         },
         {
@@ -395,7 +395,7 @@
             "NOTE: This data is NEVER used in model training, only for sizing backtest",
             "Verify date alignment with QQQ data"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 6
         },
         {
@@ -411,7 +411,7 @@
             "Compare: model-traded vs buy-hold-TQQQ vs buy-hold-QQQ",
             "Save full results to backtesting/results/tqqq_sqqq_backtest/"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 6
         },
         {
@@ -425,7 +425,7 @@
             "Optimize for maximum Sharpe with max drawdown < 25%",
             "Save optimal params to signals/sizing_config.json"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 6
         }
       ]

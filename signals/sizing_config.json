@@ -1,0 +1,9 @@
+{
+  "bull_threshold": 0.55,
+  "bear_threshold": 0.44999999999999996,
+  "max_position_pct": 0.33,
+  "scaling": "step",
+  "sharpe_ratio": 0.8311,
+  "annual_return": 0.1346,
+  "max_drawdown": -0.1917
+}
