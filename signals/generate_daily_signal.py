@@ -21,20 +21,17 @@ from features.volatility_features import compute_volatility_features
 from features.volume_features import compute_volume_features
 from features.cross_asset_features import compute_cross_asset_features
 from features.calendar_features import compute_calendar_features
-from signals.position_sizer import PositionSizer
+from signals.position_sizer import PositionSizer, LEVERAGE_LEVELS
 
 
-def load_configs() -> tuple[dict, dict]:
-    """Load model and sizing configurations.
+def load_config() -> dict:
+    """Load model configuration.
 
     Returns:
-        Tuple of (model config, sizing config).
+        Model configuration dictionary.
     """
     with open(PROJECT_ROOT / "models" / "best_config.json") as f:
-        model_config = json.load(f)
-    with open(PROJECT_ROOT / "signals" / "sizing_config.json") as f:
-        sizing_config = json.load(f)
-    return model_config, sizing_config
+        return json.load(f)
 
 
 def download_fresh_data() -> pd.DataFrame:
@@ -93,14 +90,12 @@ def compute_all_features(df: pd.DataFrame) -> pd.DataFrame:
 
 def generate_signal(
     model_config: dict,
-    sizing_config: dict,
     account_balance: float = 50000.0,
 ) -> dict:
     """Generate today's trading signal.
 
     Args:
         model_config: KNN model configuration.
-        sizing_config: Position sizing configuration.
         account_balance: Current account balance.
 
     Returns:
@@ -164,12 +159,18 @@ def generate_signal(
     tqqq_price = yf.Ticker("TQQQ").history(period="1d", auto_adjust=False)["Close"].iloc[-1]
     sqqq_price = yf.Ticker("SQQQ").history(period="1d", auto_adjust=False)["Close"].iloc[-1]
 
-    # Position sizing (tiered: 10/20/30% based on QQQ confidence)
-    sizer = PositionSizer(
-        bull_threshold=sizing_config["bull_threshold"],
-        bear_threshold=sizing_config["bear_threshold"],
+    # Get realized vol for vol targeting
+    realized_vol = None
+    vol_col = "feat_realized_vol_20d"
+    if vol_col in today_row.index:
+        realized_vol = float(today_row[vol_col])
+
+    # Position sizing with discrete leverage levels + vol targeting
+    sizer = PositionSizer(vol_target_multiple=2.0)
+    recommendation = sizer.size(
+        prob_up, account_balance, tqqq_price, sqqq_price,
+        realized_vol_annual=realized_vol,
     )
-    recommendation = sizer.size(prob_up, account_balance, tqqq_price, sqqq_price)
 
     signal = {
         "date": str(today_date),
@@ -203,6 +204,7 @@ def print_signal(signal: dict) -> None:
     """
     rec = signal["recommendation"]
     prob = signal["prob_up"]
+    leverage = rec["leverage_level"]
 
     print("\n" + "=" * 60)
     print("       KNN QQQ TRADING MODEL — DAILY SIGNAL")
@@ -213,40 +215,51 @@ def print_signal(signal: dict) -> None:
     print()
     print(f"  ┌─────────────────────────────────────────────────┐")
 
-    if rec["action"] == "BUY":
+    if leverage > 0:
         ticker = rec["ticker"]
-        tier = rec["allocation_tier"]
-        price_key = ticker.lower() + "_close"
+        alloc = rec["tqqq_allocation"]
+        price_key = "tqqq_close"
         price = signal["prices"].get(price_key, 0)
-
-        print(f"  │  ACTION:     BUY {ticker:<5s}                          │")
-        print(f"  │  Allocation: {tier:<4s} of account (${rec['dollar_amount']:>10,.2f})  │")
+        print(f"  │  ACTION:     LONG {ticker} (leverage {leverage:+d}%)         │")
+        print(f"  │  Allocation: {alloc:.0%} {ticker}, {rec['cash_allocation']:.0%} cash{' ' * 16}│")
         print(f"  │  Shares:     {rec['shares']:<6d} @ ${price:.2f}{' ' * (21 - len(f'{price:.2f}'))}│")
-        print(f"  │  Confidence: {rec['confidence_distance']:.2f} beyond threshold          │")
+        print(f"  │  Dollar amt: ${rec['dollar_amount']:>10,.2f}                    │")
+    elif leverage < 0:
+        ticker = rec["ticker"]
+        alloc = rec["sqqq_allocation"]
+        price_key = "sqqq_close"
+        price = signal["prices"].get(price_key, 0)
+        print(f"  │  ACTION:     SHORT via {ticker} (leverage {leverage:+d}%)    │")
+        print(f"  │  Allocation: {alloc:.0%} {ticker}, {rec['cash_allocation']:.0%} cash{' ' * 16}│")
+        print(f"  │  Shares:     {rec['shares']:<6d} @ ${price:.2f}{' ' * (21 - len(f'{price:.2f}'))}│")
+        print(f"  │  Dollar amt: ${rec['dollar_amount']:>10,.2f}                    │")
     else:
         print(f"  │  ACTION:     NO TRADE — STAY IN CASH              │")
-        print(f"  │  Allocation: 0% (confidence in dead zone)         │")
+        print(f"  │  Leverage:   0% (confidence in dead zone)         │")
         print(f"  │  P(up) = {prob:.1%} — not enough edge either way   │")
+
+    if rec["vol_adjusted"]:
+        print(f"  │  ⚠ Vol-adjusted: raw {rec['raw_leverage']:+d}% → {leverage:+d}%           │")
 
     print(f"  └─────────────────────────────────────────────────┘")
     print()
-    print(f"  Tier Logic (based on QQQ model only):")
-    print(f"    30% = high confidence    (distance >= 0.20)")
-    print(f"    20% = medium confidence  (distance >= 0.10)")
-    print(f"    10% = low confidence     (distance >= 0.00)")
-    print(f"     0% = dead zone          (no trade)")
+    print(f"  Leverage Levels (via TQQQ/SQQQ + cash):")
+    print(f"    +300% = 100% TQQQ    +200% = 67% TQQQ")
+    print(f"    +100% = 33% TQQQ        0% = cash")
+    print(f"    -100% = 33% SQQQ    -200% = 67% SQQQ")
+    print(f"    -300% = 100% SQQQ")
     print(f"  Account: ${signal['account_balance']:,.2f}")
     print("=" * 60)
 
 
 if __name__ == "__main__":
-    model_config, sizing_config = load_configs()
+    model_config = load_config()
 
     print("KNN QQQ Trading Model — Daily Signal Generator")
     print(f"Model: K={model_config['k']}, {model_config['metric']}, "
           f"window={model_config['training_window']}\n")
 
-    signal = generate_signal(model_config, sizing_config)
+    signal = generate_signal(model_config)
 
     # Save signal
     signals_dir = PROJECT_ROOT / "signals" / "daily_recommendations"

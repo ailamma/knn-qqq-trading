@@ -1,60 +1,122 @@
-"""Position sizing engine: converts QQQ predictions to TQQQ/SQQQ share counts.
+"""Position sizing engine: maps QQQ predictions to discrete leverage levels.
 
-All sizing decisions are based on QQQ model predictions (prob_up).
-TQQQ/SQQQ prices are used ONLY for calculating share counts — never for training.
+All sizing decisions based on QQQ model predictions (prob_up).
+TQQQ/SQQQ prices used ONLY for share count calculation — never for training.
 
-Confidence tiers (based on KNN prob_up from QQQ data):
-  - High confidence:   allocate 30% of account
-  - Medium confidence: allocate 20% of account
-  - Low confidence:    allocate 10% of account
-  - No confidence:     0% — stay in cash
+Leverage levels (implemented via TQQQ/SQQQ + cash):
+  +300% = 100% in TQQQ, 0% cash
+  +200% = 67% in TQQQ, 33% cash
+  +100% = 33% in TQQQ, 67% cash
+     0% = 100% cash (no position)
+  -100% = 33% in SQQQ, 67% cash
+  -200% = 67% in SQQQ, 33% cash
+  -300% = 100% in SQQQ, 0% cash
+
+Volatility targeting: target 2x Nasdaq-100 daily volatility.
+If realized vol * leverage exceeds target, reduce leverage.
 """
 
 from typing import Any
 
+import numpy as np
 
-# Confidence tiers: (min_distance_from_threshold, allocation_pct)
-# distance = how far prob_up is beyond the bull/bear threshold
-TIERS = [
-    (0.20, 0.30),  # High:   prob_up >= threshold + 0.20 → 30%
-    (0.10, 0.20),  # Medium: prob_up >= threshold + 0.10 → 20%
-    (0.00, 0.10),  # Low:    prob_up >= threshold         → 10%
+
+# Leverage levels and their TQQQ/SQQQ allocations
+LEVERAGE_LEVELS = {
+    300:  {"ticker": "TQQQ", "allocation": 1.00, "cash": 0.00},
+    200:  {"ticker": "TQQQ", "allocation": 0.67, "cash": 0.33},
+    100:  {"ticker": "TQQQ", "allocation": 0.33, "cash": 0.67},
+    0:    {"ticker": None,   "allocation": 0.00, "cash": 1.00},
+    -100: {"ticker": "SQQQ", "allocation": 0.33, "cash": 0.67},
+    -200: {"ticker": "SQQQ", "allocation": 0.67, "cash": 0.33},
+    -300: {"ticker": "SQQQ", "allocation": 1.00, "cash": 0.00},
+}
+
+# Default confidence → leverage mapping thresholds
+# prob_up mapped to leverage level based on distance from 0.50
+DEFAULT_THRESHOLDS = [
+    (0.85, 300),   # very high confidence bullish
+    (0.70, 200),   # high confidence bullish
+    (0.55, 100),   # moderate confidence bullish
+    (0.45, 0),     # dead zone — cash
+    (0.30, -100),  # moderate confidence bearish
+    (0.15, -200),  # high confidence bearish
+    (0.00, -300),  # very high confidence bearish
 ]
 
 
 class PositionSizer:
-    """Converts KNN QQQ predictions into TQQQ/SQQQ position recommendations.
+    """Maps KNN QQQ predictions to discrete leverage levels.
 
-    Uses tiered allocation: 10%, 20%, or 30% of account based on how far
-    the model's confidence exceeds the entry threshold. 0% if not confident.
+    Uses confidence thresholds to determine leverage, with optional
+    volatility targeting to cap leverage when realized vol is too high.
 
     Args:
-        bull_threshold: Minimum prob_up to go long TQQQ (default 0.55).
-        bear_threshold: Maximum prob_up to go short via SQQQ (default 0.45).
+        thresholds: List of (min_prob_up, leverage_level) pairs, sorted descending.
+        vol_target_multiple: Target portfolio vol as multiple of QQQ realized vol.
+            E.g., 2.0 means target 2x QQQ daily vol. Set to None to disable.
     """
 
     def __init__(
         self,
-        bull_threshold: float = 0.55,
-        bear_threshold: float = 0.45,
+        thresholds: list[tuple[float, int]] | None = None,
+        vol_target_multiple: float | None = 2.0,
     ) -> None:
-        self.bull_threshold = bull_threshold
-        self.bear_threshold = bear_threshold
+        self.thresholds = thresholds or DEFAULT_THRESHOLDS
+        self.vol_target_multiple = vol_target_multiple
 
-    def _get_tier(self, distance: float) -> tuple[float, str]:
-        """Determine allocation tier from confidence distance.
+    def _prob_to_leverage(self, prob_up: float) -> int:
+        """Map prob_up to a discrete leverage level.
 
         Args:
-            distance: How far prob_up exceeds the threshold (always >= 0).
+            prob_up: Predicted probability of QQQ going up.
 
         Returns:
-            Tuple of (allocation_pct, tier_label).
+            Leverage level: one of {-300, -200, -100, 0, 100, 200, 300}.
         """
-        for min_dist, alloc in TIERS:
-            if distance >= min_dist:
-                pct = int(alloc * 100)
-                return alloc, f"{pct}%"
-        return 0.0, "0%"
+        for min_prob, leverage in self.thresholds:
+            if prob_up >= min_prob:
+                return leverage
+        return -300  # Fallback: most bearish
+
+    def _vol_adjust_leverage(
+        self,
+        leverage: int,
+        realized_vol_annual: float,
+    ) -> int:
+        """Reduce leverage if portfolio vol would exceed target.
+
+        Args:
+            leverage: Raw leverage level from confidence mapping.
+            realized_vol_annual: QQQ annualized realized volatility.
+
+        Returns:
+            Adjusted leverage level (may be lower magnitude).
+        """
+        if self.vol_target_multiple is None or realized_vol_annual <= 0:
+            return leverage
+
+        # Target vol = vol_target_multiple * QQQ vol
+        target_vol = self.vol_target_multiple * realized_vol_annual
+
+        # Portfolio vol ≈ |leverage/100| * QQQ vol (since TQQQ ≈ 3x QQQ)
+        # Effective leverage = (allocation * 3) since TQQQ/SQQQ are 3x
+        abs_lev = abs(leverage)
+        portfolio_vol = (abs_lev / 100) * realized_vol_annual
+
+        if portfolio_vol <= target_vol:
+            return leverage
+
+        # Reduce to max leverage that keeps vol under target
+        max_lev = int(target_vol / realized_vol_annual * 100)
+        # Snap to valid level
+        sign = 1 if leverage > 0 else -1
+        valid = [0, 100, 200, 300]
+        adjusted = 0
+        for lev in valid:
+            if lev <= max_lev:
+                adjusted = lev
+        return sign * adjusted
 
     def size(
         self,
@@ -62,64 +124,66 @@ class PositionSizer:
         account_balance: float,
         tqqq_price: float,
         sqqq_price: float,
+        realized_vol_annual: float | None = None,
+        current_leverage: int = 0,
     ) -> dict[str, Any]:
-        """Generate position recommendation based on QQQ model prediction.
-
-        The model predicts QQQ direction using only QQQ + auxiliary data.
-        TQQQ/SQQQ prices here are used solely to calculate share counts.
+        """Generate leverage recommendation based on QQQ model prediction.
 
         Args:
-            prob_up: Model's predicted probability of QQQ going up (from QQQ data only).
+            prob_up: Model's predicted P(QQQ up) — from QQQ data only.
             account_balance: Current account balance in dollars.
-            tqqq_price: Current TQQQ price per share (for share count only).
-            sqqq_price: Current SQQQ price per share (for share count only).
+            tqqq_price: Current TQQQ price (for share count only).
+            sqqq_price: Current SQQQ price (for share count only).
+            realized_vol_annual: QQQ 20-day realized vol (annualized). Optional.
+            current_leverage: Current leverage level for state tracking.
 
         Returns:
-            Recommendation dict with action, ticker, shares, allocation tier.
+            Recommendation with leverage level, allocations, and share counts.
         """
-        if prob_up >= self.bull_threshold:
-            # Bullish on QQQ → buy TQQQ
-            distance = prob_up - self.bull_threshold
-            alloc_pct, tier = self._get_tier(distance)
-            dollar_amount = account_balance * alloc_pct
-            shares = int(dollar_amount / tqqq_price) if tqqq_price > 0 else 0
-            return {
-                "action": "BUY",
-                "ticker": "TQQQ",
-                "shares": shares,
-                "allocation_tier": tier,
-                "allocation_pct": alloc_pct,
-                "dollar_amount": round(dollar_amount, 2),
-                "prob_up": round(prob_up, 4),
-                "confidence_distance": round(distance, 4),
-            }
+        # Map confidence to leverage
+        raw_leverage = self._prob_to_leverage(prob_up)
 
-        elif prob_up <= self.bear_threshold:
-            # Bearish on QQQ → buy SQQQ
-            distance = self.bear_threshold - prob_up
-            alloc_pct, tier = self._get_tier(distance)
-            dollar_amount = account_balance * alloc_pct
-            shares = int(dollar_amount / sqqq_price) if sqqq_price > 0 else 0
-            return {
-                "action": "BUY",
-                "ticker": "SQQQ",
-                "shares": shares,
-                "allocation_tier": tier,
-                "allocation_pct": alloc_pct,
-                "dollar_amount": round(dollar_amount, 2),
-                "prob_up": round(prob_up, 4),
-                "confidence_distance": round(distance, 4),
-            }
-
+        # Apply vol targeting if we have vol data
+        if realized_vol_annual is not None:
+            target_leverage = self._vol_adjust_leverage(raw_leverage, realized_vol_annual)
         else:
-            # Dead zone — not confident enough either way
-            return {
-                "action": "CASH",
-                "ticker": None,
-                "shares": 0,
-                "allocation_tier": "0%",
-                "allocation_pct": 0.0,
-                "dollar_amount": 0.0,
-                "prob_up": round(prob_up, 4),
-                "confidence_distance": 0.0,
-            }
+            target_leverage = raw_leverage
+
+        # Get allocation details
+        level_info = LEVERAGE_LEVELS[target_leverage]
+        ticker = level_info["ticker"]
+        allocation_pct = level_info["allocation"]
+        cash_pct = level_info["cash"]
+
+        # Calculate shares
+        dollar_amount = account_balance * allocation_pct
+        if ticker == "TQQQ" and tqqq_price > 0:
+            shares = int(dollar_amount / tqqq_price)
+        elif ticker == "SQQQ" and sqqq_price > 0:
+            shares = int(dollar_amount / sqqq_price)
+        else:
+            shares = 0
+
+        # Determine action relative to current position
+        if target_leverage > current_leverage:
+            action = "INCREASE_LEVERAGE"
+        elif target_leverage < current_leverage:
+            action = "DECREASE_LEVERAGE"
+        else:
+            action = "HOLD_LEVERAGE"
+
+        return {
+            "leverage_level": target_leverage,
+            "raw_leverage": raw_leverage,
+            "vol_adjusted": raw_leverage != target_leverage,
+            "ticker": ticker,
+            "shares": shares,
+            "tqqq_allocation": allocation_pct if ticker == "TQQQ" else 0.0,
+            "sqqq_allocation": allocation_pct if ticker == "SQQQ" else 0.0,
+            "cash_allocation": cash_pct,
+            "dollar_amount": round(dollar_amount, 2),
+            "action": action,
+            "current_leverage": current_leverage,
+            "prob_up": round(prob_up, 4),
+            "realized_vol": round(realized_vol_annual, 4) if realized_vol_annual else None,
+        }

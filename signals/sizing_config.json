@@ -1,10 +1,15 @@
 {
-  "bull_threshold": 0.55,
-  "bear_threshold": 0.45,
-  "tiers": {
-    "high":   {"min_distance": 0.20, "allocation_pct": 0.30},
-    "medium": {"min_distance": 0.10, "allocation_pct": 0.20},
-    "low":    {"min_distance": 0.00, "allocation_pct": 0.10}
-  },
-  "note": "All decisions based on QQQ model predictions. TQQQ/SQQQ prices used only for share count calculation."
+  "leverage_system": "discrete",
+  "levels": [300, 200, 100, 0, -100, -200, -300],
+  "thresholds": [
+    [0.85, 300],
+    [0.70, 200],
+    [0.55, 100],
+    [0.45, 0],
+    [0.30, -100],
+    [0.15, -200],
+    [0.00, -300]
+  ],
+  "vol_target_multiple": 2.0,
+  "note": "All decisions based on QQQ model predictions. TQQQ/SQQQ prices used only for share count calculation. Leverage via TQQQ/SQQQ + cash allocation. Vol targeting caps leverage when realized vol is high."
 }
