@@ -80,12 +80,29 @@ knn-qqq-trading/
 
 | Phase | Name | Features | Status |
 |-------|------|----------|--------|
-| 1 | Data Pipeline | F001-F004 | 🔴 Not started |
-| 2 | Feature Engineering | F005-F011 | 🔴 Not started |
-| 3 | KNN Model Development | F012-F017 | 🔴 Not started |
-| 4 | Backtesting Engine | F018-F021 | 🔴 Not started |
-| 5 | Position Sizing (TQQQ/SQQQ) | F022-F025 | 🔴 Not started |
-| 6 | Daily Signal Generator | F026-F028 | 🔴 Not started |
+| 1 | Data Pipeline | F001-F004 | Complete |
+| 2 | Feature Engineering | F005-F011 | Complete |
+| 3 | KNN Model Development | F012-F017 | Complete |
+| 4 | Backtesting Engine | F018-F021 | Complete |
+| 5 | Position Sizing (TQQQ/SQQQ) | F022-F025 | Complete |
+| 6 | Daily Signal Generator | F026-F028 | Complete |
+
+## Backtest Results (2020-2025)
+
+| Metric | Strategy (1.0x vol) | QQQ Buy & Hold | TQQQ Buy & Hold |
+|--------|---------------------|----------------|-----------------|
+| Total Return | 482% | 184% | 364% |
+| Annual Return | 34.0% | 19.0% | — |
+| Sharpe Ratio | 1.18 | — | — |
+| Max Drawdown | -31.4% | -35.6% | — |
+
+### Known Limitation: Bullish Bias in Bear Markets
+
+The model has a structural bullish bias — it predicts QQQ "up" ~62% of days regardless of regime. During the 2022 bear market (QQQ -29%), it was still LONG 62% of the time with LONG accuracy at only 45.8%. This is the primary driver of drawdowns. Short trades actually work well (52% win rate, profitable), but the model doesn't go short often enough.
+
+Root cause: KNN learns the historical base rate (QQQ up 55% of days) and the selected features (RSI, MACD, stochastics) are mean-reverting oscillators that signal "buy" after selloffs.
+
+See [backtesting/results/BACKTEST_FINDINGS.md](backtesting/results/BACKTEST_FINDINGS.md) for full analysis.
 
 ## Development Methodology
 
@@ -114,7 +131,8 @@ python3 backtesting/engine.py
 | Parameter | Value |
 |-----------|-------|
 | Account size | $50,000 |
-| Max position | 50% of account |
-| Instruments | TQQQ (3x bull) / SQQQ (3x bear) |
+| Leverage levels | +300%, +200%, +100%, 0% (cash), -100%, -200%, -300% |
+| Instruments | TQQQ (3x bull) / SQQQ (3x bear) + cash |
 | Holding period | 1 day (EOD to EOD) |
-| Confidence dead zone | ~0.45–0.55 (stay in cash) |
+| Confidence dead zone | 0.45–0.55 (stay in cash) |
+| Vol targeting | 1.0x QQQ realized vol (caps leverage in high-vol regimes) |

@@ -189,3 +189,37 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Project complete — run `python3 signals/generate_daily_signal.py` daily at EOD
 - **Blockers:** None
 - **Features completed:** 28 / 28
+
+### Session 3 — Spec Update: Discrete Leverage + Vol Targeting (2026-02-16)
+- **What was done:**
+  - Extended data window back to 2006 (from 2011), re-ran full pipeline
+  - Re-ran feature selection, window optimization, calibration on extended data
+  - **Rewrote `signals/position_sizer.py`**: replaced tiered 10/20/30% allocation with 7 discrete leverage levels (+300% to -300%) via TQQQ/SQQQ + cash
+  - Added volatility targeting: caps leverage when realized vol × leverage > 2× QQQ vol target
+  - **Rewrote `backtesting/tqqq_sqqq_backtest.py`**: passes realized vol, tracks leverage state, reports leverage distribution
+  - **Updated `signals/generate_daily_signal.py`**: uses new PositionSizer API with vol targeting, no longer depends on sizing_config thresholds
+  - **Updated `signals/optimize_sizing.py`**: grid searches over threshold sets (wide/narrow/aggressive/conservative) × vol target multiples
+  - **Updated `signals/sizing_config.json`**: documents new leverage system
+  - All 9 tests pass
+- **Current state:** Discrete leverage system fully integrated across position sizer, backtest, daily signal, and optimizer.
+- **Next step:** Run full TQQQ/SQQQ backtest to validate new leverage system performance
+- **Blockers:** None
+- **Features completed:** 28 / 28
+
+### Session 3b — Backtest Analysis & Drawdown Deep Dive (2026-02-16)
+- **What was done:**
+  - Verified no data leakage: 0 violations across 1,508 splits, target/features verified at sample points
+  - Ran full TQQQ/SQQQ backtest: $50K → $559K, 49.2% annual, 1.16 Sharpe, -51% max DD
+  - Tested 36 dead zone × vol target combos to reduce drawdown
+  - **Best config: 10pt dead zone + 1.0x vol target** → Sharpe 1.18, 34% annual, -31.4% max DD
+  - Deep analysis of drawdown period (Nov 2021 - Jul 2022):
+    - Model has structural bullish bias: LONG 62% of days even during bear market
+    - Long accuracy drops to 45.8% during bear (vs 65% in bull)
+    - Root cause: mean-reverting features (RSI, MACD, stochastics) + historical 55% up base rate
+    - Short trades actually work (52% WR, +$36K) — model just doesn't go short enough
+  - Created BACKTEST_FINDINGS.md with full analysis
+  - Updated README with current results and known limitations
+- **Current state:** Model works well in bull/neutral regimes, underperforms in sustained bear markets due to bullish bias.
+- **Next step:** Address bullish bias — regime detection, trend-following features, asymmetric thresholds
+- **Blockers:** None
+- **Features completed:** 28 / 28
