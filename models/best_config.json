@@ -11,11 +11,11 @@
     "feat_macd_hist",
     "feat_close_position",
     "feat_return_5d",
-    "feat_stoch_k",
+    "feat_williams_r",
     "feat_daily_return",
     "feat_rsi_14",
     "feat_stoch_d",
-    "feat_williams_r"
+    "feat_stoch_k"
   ],
   "confidence_threshold": 0.58
 }
