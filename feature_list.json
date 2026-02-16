@@ -450,7 +450,7 @@
             "Saves to signals/daily_recommendations/YYYY-MM-DD.json",
             "Prints human-readable summary to console"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 7
         },
         {
@@ -466,7 +466,7 @@
             "Logs training metrics (window size, feature count, in-sample accuracy)",
             "Can be triggered by generate_daily_signal.py or run independently"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 7
         },
         {
@@ -480,7 +480,7 @@
             "Generate weekly summary stats",
             "Save to signals/journal/"
           ],
-          "passes": false,
+          "passes": true,
           "priority": 7
         }
       ]

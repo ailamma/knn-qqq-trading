@@ -176,3 +176,16 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** Phase 6, F026 — Daily signal generation script
 - **Blockers:** None
 - **Features completed:** 25 / 28
+
+### Session 2m — F026-F028: Daily Signal Generator (2026-02-15)
+- **What was done:**
+  - F026: `signals/generate_daily_signal.py` — full pipeline: download → features → predict → size → recommend
+    - Tested: predicts QQQ UP (57.1%), recommends BUY 85 TQQQ shares ($4,125, 8.2% of account)
+  - F027: `scripts/retrain_model.py` — daily retraining pipeline, saves timestamped model artifacts
+  - F028: `signals/trade_journal.py` — trade journal with signal logging, result updates, weekly summary
+- **Current state:** ALL 28 FEATURES COMPLETE. Project fully implemented.
+- **Final model:** K=7, manhattan, uniform, 750-day window, 8 features, 0.55 bull threshold
+- **Backtest results (2020-2025):** 19.2% annual, 0.91 Sharpe, -28% maxDD on QQQ; TQQQ/SQQQ: 13.5% annual, 0.83 Sharpe, -19.2% maxDD
+- **Next step:** Project complete — run `python3 signals/generate_daily_signal.py` daily at EOD
+- **Blockers:** None
+- **Features completed:** 28 / 28
