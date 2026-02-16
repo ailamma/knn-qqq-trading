@@ -164,12 +164,10 @@ def generate_signal(
     tqqq_price = yf.Ticker("TQQQ").history(period="1d", auto_adjust=False)["Close"].iloc[-1]
     sqqq_price = yf.Ticker("SQQQ").history(period="1d", auto_adjust=False)["Close"].iloc[-1]
 
-    # Position sizing
+    # Position sizing (tiered: 10/20/30% based on QQQ confidence)
     sizer = PositionSizer(
         bull_threshold=sizing_config["bull_threshold"],
         bear_threshold=sizing_config["bear_threshold"],
-        max_position_pct=sizing_config["max_position_pct"],
-        scaling=sizing_config["scaling"],
     )
     recommendation = sizer.size(prob_up, account_balance, tqqq_price, sqqq_price)
 
@@ -204,26 +202,41 @@ def print_signal(signal: dict) -> None:
         signal: Signal dictionary from generate_signal.
     """
     rec = signal["recommendation"]
-    print("\n" + "=" * 55)
-    print("  KNN QQQ TRADING MODEL — DAILY SIGNAL")
-    print("=" * 55)
-    print(f"  Date:        {signal['date']}")
-    print(f"  Prediction:  QQQ {signal['prediction']} (P(up) = {signal['prob_up']:.1%})")
-    print(f"  QQQ Close:   ${signal['prices']['qqq_close']:.2f}")
-    print(f"")
+    prob = signal["prob_up"]
+
+    print("\n" + "=" * 60)
+    print("       KNN QQQ TRADING MODEL — DAILY SIGNAL")
+    print("=" * 60)
+    print(f"  Date:           {signal['date']}")
+    print(f"  QQQ Close:      ${signal['prices']['qqq_close']:.2f}")
+    print(f"  QQQ Prediction: {signal['prediction']} (P(up) = {prob:.1%})")
+    print()
+    print(f"  ┌─────────────────────────────────────────────────┐")
 
     if rec["action"] == "BUY":
-        print(f"  >>> RECOMMENDATION: BUY {rec['shares']} shares of {rec['ticker']} <<<")
-        print(f"  Dollar Amount: ${rec['dollar_amount']:,.2f}")
-        print(f"  Position Size: {rec['position_pct']:.1%} of account")
-        print(f"  {rec['ticker']} Price: ${signal['prices'].get(rec['ticker'].lower() + '_close', 'N/A')}")
-    else:
-        print(f"  >>> RECOMMENDATION: STAY IN CASH <<<")
-        print(f"  Model confidence too low to trade.")
+        ticker = rec["ticker"]
+        tier = rec["allocation_tier"]
+        price_key = ticker.lower() + "_close"
+        price = signal["prices"].get(price_key, 0)
 
-    print(f"\n  Confidence:  {rec['confidence']:.1%}")
-    print(f"  Account:     ${signal['account_balance']:,.2f}")
-    print("=" * 55)
+        print(f"  │  ACTION:     BUY {ticker:<5s}                          │")
+        print(f"  │  Allocation: {tier:<4s} of account (${rec['dollar_amount']:>10,.2f})  │")
+        print(f"  │  Shares:     {rec['shares']:<6d} @ ${price:.2f}{' ' * (21 - len(f'{price:.2f}'))}│")
+        print(f"  │  Confidence: {rec['confidence_distance']:.2f} beyond threshold          │")
+    else:
+        print(f"  │  ACTION:     NO TRADE — STAY IN CASH              │")
+        print(f"  │  Allocation: 0% (confidence in dead zone)         │")
+        print(f"  │  P(up) = {prob:.1%} — not enough edge either way   │")
+
+    print(f"  └─────────────────────────────────────────────────┘")
+    print()
+    print(f"  Tier Logic (based on QQQ model only):")
+    print(f"    30% = high confidence    (distance >= 0.20)")
+    print(f"    20% = medium confidence  (distance >= 0.10)")
+    print(f"    10% = low confidence     (distance >= 0.00)")
+    print(f"     0% = dead zone          (no trade)")
+    print(f"  Account: ${signal['account_balance']:,.2f}")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

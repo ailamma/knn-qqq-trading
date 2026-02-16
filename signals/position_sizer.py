@@ -1,64 +1,60 @@
-"""Position sizing engine: converts QQQ predictions to TQQQ/SQQQ share counts."""
+"""Position sizing engine: converts QQQ predictions to TQQQ/SQQQ share counts.
+
+All sizing decisions are based on QQQ model predictions (prob_up).
+TQQQ/SQQQ prices are used ONLY for calculating share counts — never for training.
+
+Confidence tiers (based on KNN prob_up from QQQ data):
+  - High confidence:   allocate 30% of account
+  - Medium confidence: allocate 20% of account
+  - Low confidence:    allocate 10% of account
+  - No confidence:     0% — stay in cash
+"""
 
 from typing import Any
 
 
-class PositionSizer:
-    """Converts KNN model predictions into TQQQ/SQQQ position recommendations.
+# Confidence tiers: (min_distance_from_threshold, allocation_pct)
+# distance = how far prob_up is beyond the bull/bear threshold
+TIERS = [
+    (0.20, 0.30),  # High:   prob_up >= threshold + 0.20 → 30%
+    (0.10, 0.20),  # Medium: prob_up >= threshold + 0.10 → 20%
+    (0.00, 0.10),  # Low:    prob_up >= threshold         → 10%
+]
 
-    Scales position size by confidence level. Higher confidence = larger position.
-    Caps max position at a configurable fraction of account value.
+
+class PositionSizer:
+    """Converts KNN QQQ predictions into TQQQ/SQQQ position recommendations.
+
+    Uses tiered allocation: 10%, 20%, or 30% of account based on how far
+    the model's confidence exceeds the entry threshold. 0% if not confident.
 
     Args:
-        bull_threshold: Minimum prob_up to go long TQQQ.
-        bear_threshold: Maximum prob_up to go short via SQQQ.
-        max_position_pct: Maximum position size as fraction of account.
-        scaling: Position scaling method ('linear', 'quadratic', 'step').
+        bull_threshold: Minimum prob_up to go long TQQQ (default 0.55).
+        bear_threshold: Maximum prob_up to go short via SQQQ (default 0.45).
     """
 
     def __init__(
         self,
-        bull_threshold: float = 0.58,
-        bear_threshold: float = 0.42,
-        max_position_pct: float = 0.50,
-        scaling: str = "linear",
+        bull_threshold: float = 0.55,
+        bear_threshold: float = 0.45,
     ) -> None:
         self.bull_threshold = bull_threshold
         self.bear_threshold = bear_threshold
-        self.max_position_pct = max_position_pct
-        self.scaling = scaling
 
-    def _scale_confidence(self, prob_up: float, is_bull: bool) -> float:
-        """Scale confidence to position size fraction.
+    def _get_tier(self, distance: float) -> tuple[float, str]:
+        """Determine allocation tier from confidence distance.
 
         Args:
-            prob_up: Predicted probability of up move.
-            is_bull: True if bullish signal, False if bearish.
+            distance: How far prob_up exceeds the threshold (always >= 0).
 
         Returns:
-            Position size as fraction of max_position_pct (0 to 1).
+            Tuple of (allocation_pct, tier_label).
         """
-        if is_bull:
-            # Distance from threshold to 1.0
-            raw = (prob_up - self.bull_threshold) / (1.0 - self.bull_threshold)
-        else:
-            # Distance from threshold to 0.0
-            raw = (self.bear_threshold - prob_up) / self.bear_threshold
-
-        raw = max(0.0, min(1.0, raw))
-
-        if self.scaling == "linear":
-            return raw
-        elif self.scaling == "quadratic":
-            return raw ** 2
-        elif self.scaling == "step":
-            if raw > 0.66:
-                return 1.0
-            elif raw > 0.33:
-                return 0.5
-            else:
-                return 0.25
-        return raw
+        for min_dist, alloc in TIERS:
+            if distance >= min_dist:
+                pct = int(alloc * 100)
+                return alloc, f"{pct}%"
+        return 0.0, "0%"
 
     def size(
         self,
@@ -67,53 +63,63 @@ class PositionSizer:
         tqqq_price: float,
         sqqq_price: float,
     ) -> dict[str, Any]:
-        """Generate position recommendation.
+        """Generate position recommendation based on QQQ model prediction.
+
+        The model predicts QQQ direction using only QQQ + auxiliary data.
+        TQQQ/SQQQ prices here are used solely to calculate share counts.
 
         Args:
-            prob_up: Model's predicted probability of QQQ going up.
+            prob_up: Model's predicted probability of QQQ going up (from QQQ data only).
             account_balance: Current account balance in dollars.
-            tqqq_price: Current TQQQ price per share.
-            sqqq_price: Current SQQQ price per share.
+            tqqq_price: Current TQQQ price per share (for share count only).
+            sqqq_price: Current SQQQ price per share (for share count only).
 
         Returns:
-            Recommendation dict with action, ticker, shares, confidence, dollar_amount.
+            Recommendation dict with action, ticker, shares, allocation tier.
         """
         if prob_up >= self.bull_threshold:
-            # Bullish — buy TQQQ
-            scale = self._scale_confidence(prob_up, is_bull=True)
-            dollar_amount = account_balance * self.max_position_pct * scale
-            shares = int(dollar_amount / tqqq_price)
+            # Bullish on QQQ → buy TQQQ
+            distance = prob_up - self.bull_threshold
+            alloc_pct, tier = self._get_tier(distance)
+            dollar_amount = account_balance * alloc_pct
+            shares = int(dollar_amount / tqqq_price) if tqqq_price > 0 else 0
             return {
                 "action": "BUY",
                 "ticker": "TQQQ",
                 "shares": shares,
-                "confidence": round(prob_up, 4),
-                "scale_factor": round(scale, 4),
+                "allocation_tier": tier,
+                "allocation_pct": alloc_pct,
                 "dollar_amount": round(dollar_amount, 2),
-                "position_pct": round(dollar_amount / account_balance, 4),
+                "prob_up": round(prob_up, 4),
+                "confidence_distance": round(distance, 4),
             }
+
         elif prob_up <= self.bear_threshold:
-            # Bearish — buy SQQQ
-            scale = self._scale_confidence(prob_up, is_bull=False)
-            dollar_amount = account_balance * self.max_position_pct * scale
-            shares = int(dollar_amount / sqqq_price)
+            # Bearish on QQQ → buy SQQQ
+            distance = self.bear_threshold - prob_up
+            alloc_pct, tier = self._get_tier(distance)
+            dollar_amount = account_balance * alloc_pct
+            shares = int(dollar_amount / sqqq_price) if sqqq_price > 0 else 0
             return {
                 "action": "BUY",
                 "ticker": "SQQQ",
                 "shares": shares,
-                "confidence": round(1 - prob_up, 4),
-                "scale_factor": round(scale, 4),
+                "allocation_tier": tier,
+                "allocation_pct": alloc_pct,
                 "dollar_amount": round(dollar_amount, 2),
-                "position_pct": round(dollar_amount / account_balance, 4),
+                "prob_up": round(prob_up, 4),
+                "confidence_distance": round(distance, 4),
             }
+
         else:
-            # Dead zone — stay in cash
+            # Dead zone — not confident enough either way
             return {
                 "action": "CASH",
                 "ticker": None,
                 "shares": 0,
-                "confidence": round(abs(prob_up - 0.5), 4),
-                "scale_factor": 0.0,
+                "allocation_tier": "0%",
+                "allocation_pct": 0.0,
                 "dollar_amount": 0.0,
-                "position_pct": 0.0,
+                "prob_up": round(prob_up, 4),
+                "confidence_distance": 0.0,
             }

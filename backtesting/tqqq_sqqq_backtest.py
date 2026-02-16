@@ -92,14 +92,22 @@ def run_tqqq_sqqq_backtest(
         cash += daily_pnl
         strategy_return = daily_pnl / total_equity if total_equity > 0 else 0
 
+        # Map action to LONG/SHORT/CASH for consistent reporting
+        if rec["action"] == "BUY" and rec.get("ticker") == "TQQQ":
+            signal_label = "LONG"
+        elif rec["action"] == "BUY" and rec.get("ticker") == "SQQQ":
+            signal_label = "SHORT"
+        else:
+            signal_label = "CASH"
+
         records.append({
             "date": date,
-            "signal": rec["action"],
+            "signal": signal_label,
             "ticker": ticker,
             "shares": shares,
             "prob_up": round(row["prob_up"], 4),
-            "confidence": rec["confidence"],
-            "position_pct": rec["position_pct"],
+            "allocation_tier": rec["allocation_tier"],
+            "allocation_pct": rec["allocation_pct"],
             "actual_return": row["actual_return"],
             "strategy_return": round(strategy_return, 6),
             "daily_pnl": round(daily_pnl, 2),
@@ -137,13 +145,13 @@ if __name__ == "__main__":
         start_date="2020-01-01", end_date="2025-12-31",
     )
 
-    # Run TQQQ/SQQQ backtest
-    print("\nRunning TQQQ/SQQQ backtest...")
+    # Run TQQQ/SQQQ backtest with tiered sizing (10/20/30%)
+    print("\nRunning TQQQ/SQQQ backtest (tiered: 10/20/30%)...")
+    with open(project_root / "signals" / "sizing_config.json") as f:
+        sizing_config = json.load(f)
     sizer = PositionSizer(
-        bull_threshold=config.get("confidence_threshold", 0.58),
-        bear_threshold=1 - config.get("confidence_threshold", 0.58),
-        max_position_pct=0.50,
-        scaling="linear",
+        bull_threshold=sizing_config["bull_threshold"],
+        bear_threshold=sizing_config["bear_threshold"],
     )
 
     trade_log = run_tqqq_sqqq_backtest(predictions, tqqq, sqqq, sizer)
