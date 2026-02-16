@@ -15,7 +15,7 @@ TICKERS = {
     "GLD": "gld_daily.csv",
 }
 
-START_DATE = "1999-01-01"
+START_DATE = "2006-01-01"
 
 
 def download_ticker(ticker: str, output_path: Path) -> pd.DataFrame:

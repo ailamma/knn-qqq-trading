@@ -1,4 +1,4 @@
-"""Download QQQ daily OHLCV data from 2011-01-01 to present using yfinance."""
+"""Download QQQ daily OHLCV data from 2006-01-01 to present using yfinance."""
 
 import sys
 from pathlib import Path
@@ -9,7 +9,7 @@ import yfinance as yf
 
 
 def download_qqq_data(
-    start_date: str = "1999-01-01",
+    start_date: str = "2006-01-01",
     output_path: str = "data/raw/qqq_daily.csv",
 ) -> pd.DataFrame:
     """Download QQQ daily OHLCV data and save to CSV.

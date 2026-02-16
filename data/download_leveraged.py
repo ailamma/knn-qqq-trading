@@ -11,7 +11,7 @@ import yfinance as yf
 
 
 TICKERS = {"TQQQ": "tqqq_daily.csv", "SQQQ": "sqqq_daily.csv"}
-START_DATE = "2010-01-01"
+START_DATE = "2006-01-01"
 
 
 def download_leveraged_etfs(raw_dir: Path) -> None:
