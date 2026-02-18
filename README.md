@@ -185,6 +185,25 @@ python3 signals/generate_daily_signal.py --v1 --balance 100000
 python3 backtesting/engine.py
 ```
 
+## Execution Timing
+
+The model is trained on close-to-close returns: entry at Day T close, exit at Day T+1 close. To match this assumption, run the signal generator near market close and execute before 4:00 PM ET.
+
+**Recommended daily workflow:**
+
+| Time (ET) | Action |
+|---|---|
+| 3:55 PM | Run `python3 signals/generate_daily_signal.py --both` |
+| 3:56 PM | Review signal, decide V1 or V2 |
+| 3:58-3:59 PM | Place market order (buy TQQQ, SQQQ, or close position) |
+| 4:00 PM | Market closes, hold overnight |
+| Next day 3:55 PM | Run new signal, adjust position |
+
+**Why not run next morning?**
+- The backtest's Sharpe 1.18-1.30 assumes close-to-close execution. Entering at the next-day open introduces overnight gap risk that the model never trained on.
+- TQQQ/SQQQ regularly gap 1-3% at the open. If the model predicts UP and you wait until morning, you've already missed the overnight move.
+- At 3:55 PM, QQQ's price is within ~0.05% of the actual close — features (RSI, MACD, stochastics) are virtually identical.
+
 ## Account Parameters
 
 | Parameter | Value |

@@ -303,6 +303,9 @@ def print_signal(signal: dict) -> None:
     print(f"    -100% = 33% SQQQ    -200% = 67% SQQQ")
     print(f"    -300% = 100% SQQQ")
     print(f"  Account: ${signal['account_balance']:,.2f}")
+    print()
+    print(f"  Execution: Run at ~3:55 PM ET, place order by 3:59 PM")
+    print(f"  Hold overnight, repeat next day at 3:55 PM")
     print("=" * 60)
 
 
