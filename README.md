@@ -110,6 +110,34 @@ Mitigated by 1.0x vol targeting which caps leverage at +/-100% during volatile p
 
 See [backtesting/results/BACKTEST_FINDINGS.md](backtesting/results/BACKTEST_FINDINGS.md) for full analysis.
 
+### Risk Management: Vol Targeting vs Stop Losses
+
+We tested professional stop loss strategies (previous day low/high, 2-day low/high, pivot S1/R1) using hourly intraday data. **Stops do not improve this strategy:**
+
+| Risk Management | Sharpe | Annual | Max DD |
+|---|---|---|---|
+| Vol targeting 1.0x (production) | 1.18 | 34.0% | -31.4% |
+| + 2-Day Low/High stops | 0.80 | 21.1% | -28.8% |
+| + Prev Day Low/High stops | 0.64 | 16.1% | -26.8% |
+| No risk management | 1.18 | 55.2% | -55.2% |
+
+Vol targeting is fundamentally better for a mean-reversion KNN strategy because:
+1. **Preventive**: reduces position size before bad days (vs reactive stops that exit after damage)
+2. **Gap-proof**: 69% of stop triggers happen at the open (overnight gaps) — too late for stops to help
+3. **Preserves edge**: 53% of stopped trades would have recovered — stops cut winning mean-reversion trades
+4. **Sharpe-preserving**: vol targeting halves max DD while maintaining the same Sharpe ratio
+
+Stop loss infrastructure is available in the backtest engine (`stop_type` parameter) but not used in production.
+
+### Feature Engineering Experiments
+
+Tested additional features beyond the optimal 8; all degraded performance:
+- Overnight gap / intraday return: Sharpe 0.91 (from 1.51), bear DD improved but overall worse
+- VIX term structure (VIX/VIX3M ratio): Sharpe 0.26-0.67, worse across all metrics
+- Regime features (SMA200, golden cross, ADX): curse of dimensionality, negative Sharpe
+
+The KNN model's 8 momentum/oscillator features are tightly co-optimized. Adding fundamentally different feature types degrades the neighbor search.
+
 ## Development Methodology
 
 This project uses the **Anthropic long-running agent harness** pattern:

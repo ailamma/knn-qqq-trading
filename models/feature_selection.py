@@ -15,6 +15,7 @@ ALL_FEATURES = [
     "feat_daily_return", "feat_return_5d", "feat_return_10d", "feat_return_20d",
     "feat_dist_sma20", "feat_dist_sma50", "feat_dist_sma200",
     "feat_hl_range_pct", "feat_close_position",
+    "feat_overnight_gap", "feat_intraday_return",
     # Momentum features
     "feat_rsi_14", "feat_macd_line", "feat_macd_signal", "feat_macd_hist",
     "feat_roc_10", "feat_roc_20", "feat_stoch_k", "feat_stoch_d", "feat_williams_r",
@@ -22,6 +23,7 @@ ALL_FEATURES = [
     "feat_vix_close", "feat_vix_change_5d", "feat_vix_change_10d",
     "feat_realized_vol_10d", "feat_realized_vol_20d", "feat_iv_rv_ratio",
     "feat_bb_position", "feat_bb_width",
+    "feat_vix_term_structure", "feat_vix_ts_change_5d",
     # Volume features
     "feat_volume_ratio", "feat_volume_trend_5d", "feat_obv_roc_10d",
     "feat_vol_price_divergence",

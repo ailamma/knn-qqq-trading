@@ -46,6 +46,14 @@ def compute_price_features(df: pd.DataFrame) -> pd.DataFrame:
     hl_diff = high - low
     df["feat_close_position"] = (close - low) / hl_diff.replace(0, float("nan"))
 
+    # Overnight gap: (Open[T] - Close[T-1]) / Close[T-1]
+    # How much the market moved between yesterday's close and today's open
+    df["feat_overnight_gap"] = (df["Open"] - close.shift(1)) / close.shift(1)
+
+    # Intraday return: (Close - Open) / Open
+    # How the market moved during regular hours today
+    df["feat_intraday_return"] = (close - df["Open"]) / df["Open"]
+
     return df
 
 

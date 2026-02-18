@@ -48,6 +48,14 @@ def compute_volatility_features(df: pd.DataFrame) -> pd.DataFrame:
     # Bollinger Band width: (upper - lower) / mid
     df["feat_bb_width"] = bb_width_raw / bb_mid
 
+    # VIX term structure: VIX / VIX3M ratio
+    # > 1 = backwardation (fear/stress), < 1 = contango (normal/complacent)
+    if "VIX3M_Close" in df.columns:
+        vix3m_close = df["VIX3M_Close"]
+        df["feat_vix_term_structure"] = vix_close / vix3m_close.replace(0, float("nan"))
+        # 5-day change in term structure
+        df["feat_vix_ts_change_5d"] = df["feat_vix_term_structure"].pct_change(5)
+
     return df
 
 
@@ -63,6 +71,9 @@ def save_volatility_features(df: pd.DataFrame, output_path: Path) -> None:
         "feat_realized_vol_10d", "feat_realized_vol_20d", "feat_iv_rv_ratio",
         "feat_bb_position", "feat_bb_width",
     ]
+    # Add term structure features if present
+    if "feat_vix_term_structure" in df.columns:
+        vol_cols.extend(["feat_vix_term_structure", "feat_vix_ts_change_5d"])
     feat_df = df[vol_cols].copy()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

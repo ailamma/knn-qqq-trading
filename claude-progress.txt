@@ -237,3 +237,52 @@ Goal: consistent daily profit via EOD signal generation.
 - **Next step:** TBD — discuss further improvements
 - **Blockers:** None
 - **Features completed:** 28 / 28
+
+### Session 3d — New Feature Experiments (2026-02-16)
+- **What was done:**
+  - **Overnight gap + intraday return features:** Added to price_features.py
+    - Overnight gap alone: Sharpe dropped from 1.51→0.52, but bear accuracy +3.9%
+    - Both gap + intraday: Sharpe 0.91, max DD improved (-23.5%), bear accuracy +3.9%
+    - **Verdict: not added to baseline** — no combination beat baseline Sharpe
+  - **VIX term structure features:** Downloaded VIX3M data (4,927 rows from 2006), created feat_vix_term_structure (VIX/VIX3M ratio) and feat_vix_ts_change_5d
+    - +vix_term_structure: Sharpe 0.60 (down from 1.51), worse across all metrics
+    - +ts_change_5d: Sharpe 0.26, worse everything
+    - Swapping stoch_d or stoch_k for TS: still worse (Sharpe 0.35-0.67)
+    - **Verdict: not added** — VIX term structure hurts model performance
+  - **Key insight:** KNN's 8 momentum/oscillator features are tightly co-optimized. Adding fundamentally different feature types (term structure, overnight gaps, regime indicators) degrades neighbor search. The model's feature space is at its sweet spot.
+  - Reverted pipeline to original (no VIX3M in master merge), kept features available but not in default config
+  - Downloaded 1-hour intraday data for QQQ/TQQQ/SQQQ (2 years: Feb 2024 - Feb 2026) for future stop-loss work
+- **Current state:** Baseline 8 features confirmed optimal. New features tested and rejected.
+- **Next step:** Discuss intraday stop-loss implementation using hourly data
+- **Blockers:** None
+- **Features completed:** 28 / 28
+
+### Session 3e — Professional Stop Loss Analysis (2026-02-17)
+- **What was done:**
+  - Analyzed professional stop loss levels: prev day low/high, 2-day low/high, pivot S1/R1
+  - QQQ breaches prev day low 41.6% of days, prev day high 55.8%
+  - Integrated stop loss infrastructure into `backtesting/tqqq_sqqq_backtest.py`:
+    - `_compute_stop_levels()`: computes structural stop levels (two_day, prev_day, pivot)
+    - `_estimate_stop_exit_price()`: estimates leveraged ETF exit price with gap-down detection
+    - `run_tqqq_sqqq_backtest()`: now accepts optional `stop_type` and `qqq` parameters
+  - **Validated stop exit estimates against hourly data (2024-2025):**
+    - Proportional estimate was 0.8% too optimistic on average
+    - 69% of stops trigger at the opening bar (overnight gaps, not intraday)
+    - 53% of stopped trades would have recovered by close
+    - Fixed estimates: gap-down → exit at leveraged ETF open; intraday → proportional + 0.5% slippage
+  - **Full 2020-2025 backtest with corrected stops (all with 1.0x vol targeting):**
+    - Baseline (no stops): Sharpe 1.18, 34% annual, -31.4% maxDD
+    - 2-Day Low/High: Sharpe 0.80, 21% annual, -28.8% maxDD
+    - Prev Day Low/High: Sharpe 0.64, 16% annual, -26.8% maxDD
+    - Pivot S1/R1: Sharpe 0.72, 19% annual, -27.1% maxDD
+  - **Tested selective stops:** longs-only, low-confidence only — all reduced Sharpe
+  - **Key finding: stops don't improve this strategy.** Vol targeting (1.0x) is fundamentally better because:
+    1. It's preventive (reduces position size BEFORE bad days) vs reactive (exits AFTER damage starts)
+    2. 69% of stops trigger at open (gap downs) — damage already done before stop can help
+    3. 53% of stopped trades recover — stops cut winning mean-reversion trades
+    4. Vol targeting preserves Sharpe (1.18) while halving max DD; stops destroy Sharpe
+  - Stop loss infrastructure kept in codebase (available via `stop_type` parameter) but not used in production
+- **Current state:** Stop loss analysis complete. Vol targeting confirmed as optimal risk management.
+- **Next step:** TBD — discuss further improvements with user
+- **Blockers:** None
+- **Features completed:** 28 / 28
