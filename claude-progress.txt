@@ -283,6 +283,30 @@ Goal: consistent daily profit via EOD signal generation.
     4. Vol targeting preserves Sharpe (1.18) while halving max DD; stops destroy Sharpe
   - Stop loss infrastructure kept in codebase (available via `stop_type` parameter) but not used in production
 - **Current state:** Stop loss analysis complete. Vol targeting confirmed as optimal risk management.
+
+### Session 3f — Ensemble Models & V1/V2 Signal Generator
+- **Trend-following veto (option #1):** Tested 8 SMA-based trend veto strategies (SMA50/100/200 hard/soft/flip/dual/trend-score). All reduced Sharpe — best was SMA200 veto at 1.04 (from 1.18). Vol targeting already handles regime risk better.
+- **Ensemble models (option #5):** Tested KNN, LR, RF, GB individually and ensembles:
+  - KNN+LR 70/30 blend: Sharpe 1.30 (best), error correlation 0.278 (highly complementary)
+  - KNN+RF: Sharpe 1.15, KNN+GB: Sharpe 1.07
+  - When all 3 models agree: 58.8% accuracy vs 54.3% KNN alone
+- **Deeper analysis of KNN+LR 70/30 blend:**
+  - Tuned blend weights: 65-70% KNN optimal (both Sharpe 1.30)
+  - Threshold variants tested — default (0.45-0.55 dead zone) already optimal
+  - Period analysis: blend helps 2023-2025 (+19.5%), but hurts in bear markets (2022: +15.4% vs +30.7% KNN-only)
+  - Max drawdown slightly worse: -33.1% vs -31.4%
+- **Decision:** Keep both as selectable model versions:
+  - V1 (ensemble): KNN 70% + LR 30% — higher Sharpe (1.30), smoother
+  - V2 (KNN-only): original model — better bear markets, lower drawdown
+- **Refactored generate_daily_signal.py:**
+  - Added `--v1`, `--v2`, `--both` CLI arguments
+  - Extracted `_prepare_training_data()` to share data across model versions
+  - Added `prepared_data` parameter to avoid re-downloading in `--both` mode
+  - Signal JSON includes `model_version`, `knn_prob_up`, `lr_prob_up`, `blend_weights`
+  - `print_signal()` shows component probabilities for V1
+  - `--both` mode prints side-by-side comparison
+- **Updated README:** Added Model Versions comparison table, expanded Quick Start with all CLI options
+- **All modes tested end-to-end:** `--v1`, `--v2`, `--both` all produce correct signals
 - **Next step:** TBD — discuss further improvements with user
 - **Blockers:** None
 - **Features completed:** 28 / 28

@@ -147,14 +147,39 @@ This project uses the **Anthropic long-running agent harness** pattern:
 - **Git commits** after each feature completion with descriptive messages
 - **Incremental progress** — one feature at a time, always leave code in a clean state
 
+## Model Versions
+
+Two model versions are available for daily signal generation:
+
+| | V1 (Ensemble) | V2 (KNN-only) |
+|---|---|---|
+| Method | KNN 70% + Logistic Regression 30% blend | KNN only |
+| Sharpe Ratio | 1.30 | 1.18 |
+| Total Return (2020-2025) | 478% | 478% |
+| Max Drawdown | -33.1% | -31.4% |
+| Bear Market (2022) | +15.4% | +30.7% |
+| Best for | Smoother returns, higher Sharpe | Bear market resilience, lower drawdown |
+
+V1 blends KNN neighbor-vote probabilities with a logistic regression probability estimate. The two models have low error correlation (0.278), so the blend smooths predictions. V2 is the original KNN-only model which performs better during bear markets.
+
 ## Quick Start
 
 ```bash
 # Bootstrap environment
 chmod +x init.sh && ./init.sh
 
-# Generate today's signal (once model is trained)
+# Generate today's signal (default: V1 ensemble)
 python3 signals/generate_daily_signal.py
+
+# Generate V1 (ensemble) or V2 (KNN-only) signal
+python3 signals/generate_daily_signal.py --v1
+python3 signals/generate_daily_signal.py --v2
+
+# Run both models and compare
+python3 signals/generate_daily_signal.py --both
+
+# Custom account balance
+python3 signals/generate_daily_signal.py --v1 --balance 100000
 
 # Run full backtest
 python3 backtesting/engine.py

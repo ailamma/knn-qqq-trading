@@ -1,5 +1,17 @@
-"""Daily signal generation: run at EOD to generate next-day TQQQ/SQQQ recommendation."""
+"""Daily signal generation: run at EOD to generate next-day TQQQ/SQQQ recommendation.
 
+Two model versions available:
+  V1 (ensemble): KNN 70% + Logistic Regression 30% blend — higher Sharpe (1.30), smoother
+  V2 (knn-only): KNN only — higher total return, better in bear markets
+
+Usage:
+  python signals/generate_daily_signal.py          # default (V1 ensemble)
+  python signals/generate_daily_signal.py --v1     # V1 ensemble
+  python signals/generate_daily_signal.py --v2     # V2 KNN-only
+  python signals/generate_daily_signal.py --both   # run both, show comparison
+"""
+
+import argparse
 import json
 import sys
 from datetime import datetime
@@ -9,6 +21,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 # Add project root to path
@@ -90,18 +103,14 @@ def compute_all_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def generate_signal(
-    model_config: dict,
-    account_balance: float = 50000.0,
-) -> dict:
-    """Generate today's trading signal.
+def _prepare_training_data(model_config: dict) -> tuple:
+    """Download data, compute features, prepare training arrays.
 
     Args:
-        model_config: KNN model configuration.
-        account_balance: Current account balance.
+        model_config: Model configuration dictionary.
 
     Returns:
-        Signal recommendation dictionary.
+        Tuple of (train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler).
     """
     print("Downloading latest market data...")
     master = download_fresh_data()
@@ -110,7 +119,6 @@ def generate_signal(
     print("Computing features...")
     master = compute_all_features(master)
 
-    # Drop NaN rows
     feat_cols = [c for c in master.columns if c.startswith("feat_")]
     master = master.dropna(subset=feat_cols)
     print(f"  Clean data: {len(master)} rows")
@@ -118,56 +126,89 @@ def generate_signal(
     features = model_config["features"]
     training_window = model_config["training_window"]
 
-    # Train on the most recent window, predict for today
-    X = master[features].values
-    # We need a target for training — use daily return direction
+    # Save today's row before dropping
+    today_row = master.iloc[-1]
+    today_X = today_row[features].values.reshape(1, -1)
+    today_date = master.index[-1].date()
+
+    # Target: next-day direction (drop last row — no future target)
     master["_target"] = (master["Close"].pct_change().shift(-1) > 0).astype(int)
-    # Drop last row (no target)
     master = master.iloc[:-1]
     X = master[features].values
     y = master["_target"].values
 
-    # Training data: last `training_window` rows before today
     train_X = X[-training_window:]
     train_y = y[-training_window:]
 
-    # Today's features (last row after training)
-    # Re-download to get today's row
-    master_full = download_fresh_data()
-    master_full = compute_all_features(master_full)
-    master_full = master_full.dropna(subset=feat_cols)
-    today_row = master_full.iloc[-1]
-    today_X = today_row[features].values.reshape(1, -1)
-    today_date = master_full.index[-1].date()
-
-    # Scale
     scaler = StandardScaler()
     train_X_scaled = scaler.fit_transform(train_X)
     today_X_scaled = scaler.transform(today_X)
 
-    # Fit and predict
+    return train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler
+
+
+def generate_signal(
+    model_config: dict,
+    account_balance: float = 50000.0,
+    model_version: str = "v1",
+    prepared_data: tuple | None = None,
+) -> dict:
+    """Generate today's trading signal.
+
+    Args:
+        model_config: KNN model configuration.
+        account_balance: Current account balance.
+        model_version: "v1" (KNN+LR ensemble) or "v2" (KNN only).
+        prepared_data: Pre-computed training data tuple to avoid re-downloading.
+
+    Returns:
+        Signal recommendation dictionary.
+    """
+    if prepared_data is not None:
+        train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler = prepared_data
+    else:
+        train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler = \
+            _prepare_training_data(model_config)
+
+    features = model_config["features"]
+
+    # Fit KNN
     knn = KNeighborsClassifier(
         n_neighbors=model_config["k"],
         metric=model_config["metric"],
         weights=model_config["weights"],
     )
     knn.fit(train_X_scaled, train_y)
+    knn_proba = knn.predict_proba(today_X_scaled)[0]
+    knn_prob_up = float(knn_proba[1] if len(knn_proba) > 1 else knn_proba[0])
 
-    prediction = knn.predict(today_X_scaled)[0]
-    proba = knn.predict_proba(today_X_scaled)[0]
-    prob_up = proba[1] if len(proba) > 1 else proba[0]
+    if model_version == "v1":
+        # V1: KNN 70% + LR 30% blend
+        lr = LogisticRegression(max_iter=1000, C=1.0, random_state=42)
+        lr.fit(train_X_scaled, train_y)
+        lr_proba = lr.predict_proba(today_X_scaled)[0]
+        lr_prob_up = float(lr_proba[1] if len(lr_proba) > 1 else lr_proba[0])
+        prob_up = 0.7 * knn_prob_up + 0.3 * lr_prob_up
+        version_label = "V1 (KNN 70% + LR 30%)"
+    else:
+        # V2: KNN only
+        prob_up = knn_prob_up
+        lr_prob_up = None
+        version_label = "V2 (KNN only)"
+
+    prediction = 1 if prob_up > 0.5 else 0
 
     # Get current TQQQ/SQQQ prices
     tqqq_price = yf.Ticker("TQQQ").history(period="1d", auto_adjust=False)["Close"].iloc[-1]
     sqqq_price = yf.Ticker("SQQQ").history(period="1d", auto_adjust=False)["Close"].iloc[-1]
 
-    # Get realized vol for vol targeting
+    # Realized vol for vol targeting
     realized_vol = None
     vol_col = "feat_realized_vol_20d"
     if vol_col in today_row.index:
         realized_vol = float(today_row[vol_col])
 
-    # Position sizing with discrete leverage levels + vol targeting
+    # Position sizing
     sizer = PositionSizer(vol_target_multiple=1.0)
     recommendation = sizer.size(
         prob_up, account_balance, tqqq_price, sqqq_price,
@@ -177,15 +218,20 @@ def generate_signal(
     signal = {
         "date": str(today_date),
         "generated_at": datetime.now().isoformat(),
+        "model_version": model_version,
+        "model_version_label": version_label,
         "prediction": "UP" if prediction == 1 else "DOWN",
         "prob_up": round(float(prob_up), 4),
+        "knn_prob_up": round(float(knn_prob_up), 4),
+        "lr_prob_up": round(float(lr_prob_up), 4) if lr_prob_up is not None else None,
         "recommendation": recommendation,
         "model_details": {
             "k": model_config["k"],
             "metric": model_config["metric"],
             "weights": model_config["weights"],
-            "training_window": training_window,
+            "training_window": model_config["training_window"],
             "features_used": features,
+            "blend_weights": {"knn": 0.7, "lr": 0.3} if model_version == "v1" else {"knn": 1.0},
         },
         "prices": {
             "qqq_close": round(float(today_row["Close"]), 2),
@@ -207,13 +253,19 @@ def print_signal(signal: dict) -> None:
     rec = signal["recommendation"]
     prob = signal["prob_up"]
     leverage = rec["leverage_level"]
+    version = signal.get("model_version_label", "unknown")
 
     print("\n" + "=" * 60)
     print("       KNN QQQ TRADING MODEL — DAILY SIGNAL")
     print("=" * 60)
+    print(f"  Model:          {version}")
     print(f"  Date:           {signal['date']}")
     print(f"  QQQ Close:      ${signal['prices']['qqq_close']:.2f}")
     print(f"  QQQ Prediction: {signal['prediction']} (P(up) = {prob:.1%})")
+    if signal.get("lr_prob_up") is not None:
+        print(f"    KNN P(up):    {signal['knn_prob_up']:.1%}")
+        print(f"    LR P(up):     {signal['lr_prob_up']:.1%}")
+        print(f"    Blended:      {prob:.1%}")
     print()
     print(f"  ┌─────────────────────────────────────────────────┐")
 
@@ -255,20 +307,62 @@ def print_signal(signal: dict) -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="KNN QQQ Trading Model — Daily Signal Generator")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--v1", action="store_true", help="V1: KNN+LR ensemble (default)")
+    group.add_argument("--v2", action="store_true", help="V2: KNN only")
+    group.add_argument("--both", action="store_true", help="Run both models and compare")
+    parser.add_argument("--balance", type=float, default=50000.0, help="Account balance (default: 50000)")
+    args = parser.parse_args()
+
     model_config = load_config()
+
+    if args.both:
+        # Run both versions
+        versions = ["v1", "v2"]
+    elif args.v2:
+        versions = ["v2"]
+    else:
+        versions = ["v1"]  # default
 
     print("KNN QQQ Trading Model — Daily Signal Generator")
     print(f"Model: K={model_config['k']}, {model_config['metric']}, "
-          f"window={model_config['training_window']}\n")
+          f"window={model_config['training_window']}")
+    print(f"Running: {', '.join(v.upper() for v in versions)}\n")
 
-    signal = generate_signal(model_config)
-
-    # Save signal
     signals_dir = PROJECT_ROOT / "signals" / "daily_recommendations"
     signals_dir.mkdir(parents=True, exist_ok=True)
-    signal_path = signals_dir / f"{signal['date']}.json"
-    with open(signal_path, "w") as f:
-        json.dump(signal, f, indent=2)
 
-    print_signal(signal)
-    print(f"\n  Signal saved to {signal_path}")
+    # Prepare data once (avoid re-downloading for --both)
+    prepared = _prepare_training_data(model_config)
+
+    for version in versions:
+        signal = generate_signal(model_config, account_balance=args.balance,
+                                 model_version=version, prepared_data=prepared)
+
+        signal_path = signals_dir / f"{signal['date']}_{version}.json"
+        with open(signal_path, "w") as f:
+            json.dump(signal, f, indent=2)
+
+        print_signal(signal)
+        print(f"  Signal saved to {signal_path}")
+
+    if args.both and len(versions) == 2:
+        print("\n" + "=" * 60)
+        print("       MODEL COMPARISON")
+        print("=" * 60)
+        # Re-read saved signals for comparison
+        v1_path = signals_dir / f"{signal['date']}_v1.json"
+        v2_path = signals_dir / f"{signal['date']}_v2.json"
+        if v1_path.exists() and v2_path.exists():
+            with open(v1_path) as f:
+                v1 = json.load(f)
+            with open(v2_path) as f:
+                v2 = json.load(f)
+            v1r = v1["recommendation"]
+            v2r = v2["recommendation"]
+            agree = v1["prediction"] == v2["prediction"]
+            print(f"  V1 (ensemble): {v1['prediction']} P(up)={v1['prob_up']:.1%} → {v1r['leverage_level']:+d}% leverage")
+            print(f"  V2 (KNN-only): {v2['prediction']} P(up)={v2['prob_up']:.1%} → {v2r['leverage_level']:+d}% leverage")
+            print(f"  Models {'AGREE' if agree else 'DISAGREE'}")
+        print("=" * 60)
