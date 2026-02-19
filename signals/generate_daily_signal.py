@@ -48,32 +48,92 @@ def load_config() -> dict:
         return json.load(f)
 
 
+# Mapping: yfinance ticker → (column prefix, local CSV filename)
+TICKER_MAP = {
+    "QQQ": (None, "qqq_daily.csv"),
+    "^VIX": ("VIX", "vix_daily.csv"),
+    "SPY": ("SPY", "spy_daily.csv"),
+    "IWM": ("IWM", "iwm_daily.csv"),
+    "TLT": ("TLT", "tlt_daily.csv"),
+    "GLD": ("GLD", "gld_daily.csv"),
+}
+
+KEEP_COLS = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
+
+
+def _load_or_download_ticker(
+    yf_ticker: str, prefix: str | None, csv_path: Path,
+) -> pd.DataFrame:
+    """Load ticker from local cache and download only missing days.
+
+    Args:
+        yf_ticker: Yahoo Finance ticker symbol.
+        prefix: Column prefix (None for QQQ).
+        csv_path: Path to local CSV cache file.
+
+    Returns:
+        Full DataFrame with all available history.
+    """
+    from datetime import timedelta
+
+    cached = None
+    if csv_path.exists():
+        cached = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+        last_date = cached.index[-1]
+        # Download from 2 days before last cached date to handle corrections
+        start = (last_date - timedelta(days=2)).strftime("%Y-%m-%d")
+        new = yf.Ticker(yf_ticker).history(start=start, auto_adjust=False)
+    else:
+        new = yf.Ticker(yf_ticker).history(start="2003-01-01", auto_adjust=False)
+
+    new = new[[c for c in KEEP_COLS if c in new.columns]]
+    new.index = pd.to_datetime(new.index).tz_localize(None)
+
+    if cached is not None:
+        # Overwrite overlapping dates with fresh data, append new dates
+        combined = cached.copy()
+        for date in new.index:
+            combined.loc[date] = new.loc[date]
+        combined = combined.sort_index()
+        combined = combined[~combined.index.duplicated(keep="last")]
+        df = combined
+    else:
+        df = new
+
+    # Save updated cache
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(csv_path)
+
+    if prefix:
+        df.columns = [f"{prefix}_{c}" for c in df.columns]
+
+    return df
+
+
 def download_fresh_data() -> pd.DataFrame:
-    """Download latest data for all tickers and merge.
+    """Load cached data and download only incremental updates, then merge.
 
     Returns:
         Merged DataFrame with all tickers aligned.
     """
-    tickers = {
-        "QQQ": None,
-        "^VIX": "VIX",
-        "SPY": "SPY",
-        "IWM": "IWM",
-        "TLT": "TLT",
-        "GLD": "GLD",
-    }
-
+    raw_dir = PROJECT_ROOT / "data" / "raw"
     dfs = {}
-    for yf_ticker, prefix in tickers.items():
-        t = yf.Ticker(yf_ticker)
-        df = t.history(start="2003-01-01", auto_adjust=False)
-        cols = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
-        df = df[[c for c in cols if c in df.columns]]
-        df.index = pd.to_datetime(df.index).tz_localize(None)
 
-        if prefix:
-            df.columns = [f"{prefix}_{c}" for c in df.columns]
-
+    for yf_ticker, (prefix, filename) in TICKER_MAP.items():
+        csv_path = raw_dir / filename
+        cached_rows = 0
+        if csv_path.exists():
+            cached = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+            cached_rows = len(cached)
+            last_date = cached.index[-1].date()
+            label = f"cached to {last_date}, updating"
+        else:
+            label = "full download"
+        df = _load_or_download_ticker(yf_ticker, prefix, csv_path)
+        new_rows = len(df) - cached_rows
+        ticker_label = prefix or "QQQ"
+        if new_rows > 0:
+            print(f"    {ticker_label}: +{new_rows} new rows ({label})")
         dfs[yf_ticker] = df
 
     # Inner join
