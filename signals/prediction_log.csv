@@ -1,0 +1,3 @@
+signal_date,predict_date,model_version,prediction,prob_up,knn_prob_up,lr_prob_up,leverage_level,ticker,shares,qqq_close,actual_direction,actual_return,correct,pnl
+2026-02-18,2026-02-19,v1,DOWN,0.488,0.4286,0.6265,0,,0,605.79,,,,
+2026-02-18,2026-02-19,v2,DOWN,0.4286,0.4286,,-100,SQQQ,231,605.79,,,,

@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import csv
 import json
 import sys
 from datetime import datetime
@@ -369,6 +370,213 @@ def print_signal(signal: dict) -> None:
     print("=" * 60)
 
 
+PREDICTION_LOG_PATH = PROJECT_ROOT / "signals" / "prediction_log.csv"
+
+PREDICTION_LOG_COLUMNS = [
+    "signal_date", "predict_date", "model_version", "prediction",
+    "prob_up", "knn_prob_up", "lr_prob_up", "leverage_level",
+    "ticker", "shares", "qqq_close",
+    "actual_direction", "actual_return", "correct", "pnl",
+]
+
+
+def _get_next_trading_day(signal_date: str, qqq_data: pd.DataFrame) -> str | None:
+    """Find the next trading day after signal_date in QQQ data.
+
+    Args:
+        signal_date: Date string (YYYY-MM-DD).
+        qqq_data: QQQ DataFrame with DatetimeIndex.
+
+    Returns:
+        Next trading day as string, or None if not found.
+    """
+    sig_dt = pd.Timestamp(signal_date)
+    future = qqq_data.index[qqq_data.index > sig_dt]
+    if len(future) > 0:
+        return str(future[0].date())
+    return None
+
+
+def _resolve_pending_predictions(qqq_data: pd.DataFrame) -> None:
+    """Resolve pending predictions by filling in actual outcomes.
+
+    Reads prediction_log.csv, finds rows without actual_direction,
+    looks up actual QQQ returns, and updates the CSV.
+
+    Args:
+        qqq_data: QQQ DataFrame with DatetimeIndex and Close column.
+    """
+    if not PREDICTION_LOG_PATH.exists():
+        return
+
+    df = pd.read_csv(PREDICTION_LOG_PATH, dtype=str)
+    if df.empty:
+        return
+
+    pending = df["actual_direction"].isna() | (df["actual_direction"] == "")
+    if not pending.any():
+        return
+
+    resolved_count = 0
+    for idx in df.index[pending]:
+        signal_date = df.at[idx, "signal_date"]
+        predict_date = df.at[idx, "predict_date"]
+
+        sig_dt = pd.Timestamp(signal_date)
+        pred_dt = pd.Timestamp(predict_date)
+
+        # Need both signal_date and predict_date closes
+        if sig_dt not in qqq_data.index or pred_dt not in qqq_data.index:
+            continue
+
+        close_signal = qqq_data.loc[sig_dt, "Close"]
+        close_predict = qqq_data.loc[pred_dt, "Close"]
+        actual_return = (close_predict - close_signal) / close_signal
+        actual_direction = "UP" if actual_return > 0 else "DOWN"
+        prediction = df.at[idx, "prediction"]
+        correct = 1 if actual_direction == prediction else 0
+
+        # Estimate P&L: leverage_level% * actual_return * qqq_close
+        leverage = int(df.at[idx, "leverage_level"])
+        qqq_close = float(df.at[idx, "qqq_close"])
+        # leverage is effective: +300 means 3x long, -300 means 3x short
+        # P&L = (leverage/100) * actual_return * account_value_proxy
+        # Use qqq_close * shares as dollar exposure for a simpler estimate
+        shares = int(df.at[idx, "shares"]) if df.at[idx, "shares"] not in ("", "0") else 0
+        ticker = df.at[idx, "ticker"]
+        if ticker == "TQQQ":
+            # TQQQ moves ~3x QQQ, so P&L ≈ shares * tqqq_price * 3 * actual_return
+            # Simpler: use leverage_level/100 * actual_return * qqq_close as proxy
+            pnl = (leverage / 100) * actual_return * qqq_close
+        elif ticker == "SQQQ":
+            pnl = (leverage / 100) * actual_return * qqq_close
+        else:
+            pnl = 0.0
+
+        df.at[idx, "actual_direction"] = actual_direction
+        df.at[idx, "actual_return"] = f"{actual_return:.6f}"
+        df.at[idx, "correct"] = str(correct)
+        df.at[idx, "pnl"] = f"{pnl:.2f}"
+        resolved_count += 1
+
+    if resolved_count > 0:
+        df.to_csv(PREDICTION_LOG_PATH, index=False)
+        print(f"\n  Resolved {resolved_count} pending prediction(s):")
+        for idx in df.index[pending]:
+            if df.at[idx, "actual_direction"] != "" and pd.notna(df.at[idx, "actual_direction"]):
+                pred = df.at[idx, "prediction"]
+                actual = df.at[idx, "actual_direction"]
+                ret = df.at[idx, "actual_return"]
+                mark = "Y" if df.at[idx, "correct"] == "1" else "X"
+                print(f"    [{mark}] {df.at[idx, 'signal_date']} {df.at[idx, 'model_version']}: "
+                      f"predicted {pred}, actual {actual} ({float(ret):+.2%})")
+
+
+def _log_prediction(signal: dict, qqq_data: pd.DataFrame) -> None:
+    """Append a new prediction to prediction_log.csv.
+
+    Args:
+        signal: Signal dictionary from generate_signal.
+        qqq_data: QQQ DataFrame for finding next trading day.
+    """
+    signal_date = signal["date"]
+    predict_date = _get_next_trading_day(signal_date, qqq_data)
+    if predict_date is None:
+        # Estimate next trading day as signal_date + 1 business day
+        predict_date = str((pd.Timestamp(signal_date) + pd.offsets.BDay(1)).date())
+
+    rec = signal["recommendation"]
+    row = {
+        "signal_date": signal_date,
+        "predict_date": predict_date,
+        "model_version": signal["model_version"],
+        "prediction": signal["prediction"],
+        "prob_up": signal["prob_up"],
+        "knn_prob_up": signal["knn_prob_up"],
+        "lr_prob_up": signal.get("lr_prob_up", ""),
+        "leverage_level": rec["leverage_level"],
+        "ticker": rec["ticker"],
+        "shares": rec["shares"],
+        "qqq_close": signal["prices"]["qqq_close"],
+        "actual_direction": "",
+        "actual_return": "",
+        "correct": "",
+        "pnl": "",
+    }
+
+    file_exists = PREDICTION_LOG_PATH.exists()
+
+    # Check for duplicate (same signal_date + model_version)
+    if file_exists:
+        existing = pd.read_csv(PREDICTION_LOG_PATH, dtype=str)
+        mask = (existing["signal_date"] == signal_date) & \
+               (existing["model_version"] == signal["model_version"])
+        if mask.any():
+            # Update existing row instead of duplicating
+            for col in ["prediction", "prob_up", "knn_prob_up", "lr_prob_up",
+                        "leverage_level", "ticker", "shares", "qqq_close"]:
+                existing.loc[mask, col] = str(row[col])
+            existing.to_csv(PREDICTION_LOG_PATH, index=False)
+            return
+
+    with open(PREDICTION_LOG_PATH, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=PREDICTION_LOG_COLUMNS)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
+
+
+def _print_scorecard() -> None:
+    """Print a running accuracy scorecard from prediction_log.csv."""
+    if not PREDICTION_LOG_PATH.exists():
+        return
+
+    df = pd.read_csv(PREDICTION_LOG_PATH, dtype=str)
+    resolved = df[df["correct"].notna() & (df["correct"] != "")]
+    if resolved.empty:
+        return
+
+    resolved = resolved.copy()
+    resolved["correct"] = resolved["correct"].astype(int)
+    resolved["pnl"] = resolved["pnl"].astype(float)
+
+    total = len(resolved)
+    accuracy = resolved["correct"].mean()
+    cum_pnl = resolved["pnl"].sum()
+
+    # Recent streak
+    recent = resolved.sort_values("signal_date")["correct"].values
+    streak = 0
+    if len(recent) > 0:
+        last_val = recent[-1]
+        for v in reversed(recent):
+            if v == last_val:
+                streak += 1
+            else:
+                break
+        streak_label = f"{streak}W" if last_val == 1 else f"{streak}L"
+    else:
+        streak_label = "-"
+
+    print(f"\n{'=' * 60}")
+    print(f"       PREDICTION SCORECARD")
+    print(f"{'=' * 60}")
+    print(f"  Total predictions resolved: {total}")
+    print(f"  Accuracy:                   {accuracy:.1%} ({resolved['correct'].sum()}/{total})")
+    print(f"  Current streak:             {streak_label}")
+    print(f"  Cumulative P&L (proxy):     ${cum_pnl:+,.2f}")
+
+    # V1 vs V2 breakdown
+    for ver in ["v1", "v2"]:
+        ver_df = resolved[resolved["model_version"] == ver]
+        if not ver_df.empty:
+            ver_acc = ver_df["correct"].mean()
+            ver_pnl = ver_df["pnl"].sum()
+            print(f"  {ver.upper()}: {ver_acc:.1%} accuracy ({len(ver_df)} predictions), P&L ${ver_pnl:+,.2f}")
+
+    print(f"{'=' * 60}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="KNN QQQ Trading Model — Daily Signal Generator")
     group = parser.add_mutually_exclusive_group()
@@ -399,6 +607,11 @@ if __name__ == "__main__":
     # Prepare data once (avoid re-downloading for --both)
     prepared = _prepare_training_data(model_config)
 
+    # Resolve any pending predictions from previous runs using fresh QQQ data
+    qqq_csv = PROJECT_ROOT / "data" / "raw" / "qqq_daily.csv"
+    qqq_data = pd.read_csv(qqq_csv, index_col=0, parse_dates=True)
+    _resolve_pending_predictions(qqq_data)
+
     for version in versions:
         signal = generate_signal(model_config, account_balance=args.balance,
                                  model_version=version, prepared_data=prepared)
@@ -406,6 +619,9 @@ if __name__ == "__main__":
         signal_path = signals_dir / f"{signal['date']}_{version}.json"
         with open(signal_path, "w") as f:
             json.dump(signal, f, indent=2)
+
+        # Log prediction to CSV tracker
+        _log_prediction(signal, qqq_data)
 
         print_signal(signal)
         print(f"  Signal saved to {signal_path}")
@@ -429,3 +645,8 @@ if __name__ == "__main__":
             print(f"  V2 (KNN-only): {v2['prediction']} P(up)={v2['prob_up']:.1%} → {v2r['leverage_level']:+d}% leverage")
             print(f"  Models {'AGREE' if agree else 'DISAGREE'}")
         print("=" * 60)
+
+    # Print running scorecard if we have resolved predictions
+    _print_scorecard()
+
+    print(f"\n  Prediction log: {PREDICTION_LOG_PATH}")
