@@ -137,6 +137,36 @@ def download_fresh_data() -> pd.DataFrame:
             print(f"    {ticker_label}: +{new_rows} new rows ({label})")
         dfs[yf_ticker] = df
 
+    # If today's QQQ data is missing (market still open), fetch real-time quote
+    today = pd.Timestamp(datetime.now().date())
+    qqq_df = dfs["QQQ"]
+    if today not in qqq_df.index:
+        try:
+            ticker_info = yf.Ticker("QQQ")
+            fast_info = ticker_info.fast_info
+            current_price = fast_info.get("lastPrice") or fast_info.get("previousClose")
+            if current_price:
+                # Create approximate row using current price
+                approx_row = pd.Series({
+                    "Open": current_price,
+                    "High": current_price,
+                    "Low": current_price,
+                    "Close": current_price,
+                    "Adj Close": current_price,
+                    "Volume": 0,
+                }, name=today)
+                qqq_df = pd.concat([qqq_df, approx_row.to_frame().T])
+                dfs["QQQ"] = qqq_df
+                print(f"    QQQ: using real-time price ${current_price:.2f} as approx close for {today.date()}")
+
+                # Also update the cached CSV so resolve can find it
+                raw_dir = PROJECT_ROOT / "data" / "raw"
+                cached_qqq = pd.read_csv(raw_dir / "qqq_daily.csv", index_col=0, parse_dates=True)
+                cached_qqq.loc[today] = approx_row
+                cached_qqq.to_csv(raw_dir / "qqq_daily.csv")
+        except Exception as e:
+            print(f"    QQQ: could not fetch real-time price ({e})")
+
     # Inner join
     master = dfs["QQQ"]
     for key in ["^VIX", "SPY", "IWM", "TLT", "GLD"]:
@@ -171,7 +201,7 @@ def _prepare_training_data(model_config: dict) -> tuple:
         model_config: Model configuration dictionary.
 
     Returns:
-        Tuple of (train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler).
+        Tuple of (train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler, train_dates).
     """
     print("Downloading latest market data...")
     master = download_fresh_data()
@@ -200,12 +230,51 @@ def _prepare_training_data(model_config: dict) -> tuple:
 
     train_X = X[-training_window:]
     train_y = y[-training_window:]
+    train_dates = master.index[-training_window:]
 
     scaler = StandardScaler()
     train_X_scaled = scaler.fit_transform(train_X)
     today_X_scaled = scaler.transform(today_X)
 
-    return train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler
+    return train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler, train_dates
+
+
+ENSEMBLE_KS = [11, 15, 21]
+
+
+def _recency_weighted_knn_proba(
+    knn: KNeighborsClassifier,
+    X_today: np.ndarray,
+    train_y: np.ndarray,
+    train_dates: pd.DatetimeIndex,
+    decay_days: int = 180,
+) -> float:
+    """Compute recency-weighted probability from KNN neighbors.
+
+    Recent neighbors get higher weight via exponential decay.
+
+    Args:
+        knn: Fitted KNeighborsClassifier.
+        X_today: Today's feature vector (1, n_features).
+        train_y: Training labels array.
+        train_dates: DatetimeIndex of training rows.
+        decay_days: Half-life for exponential decay in days.
+
+    Returns:
+        Weighted probability of UP (class 1).
+    """
+    distances, indices = knn.kneighbors(X_today)
+    indices = indices[0]
+
+    neighbor_dates = train_dates[indices]
+    last_train_date = train_dates[-1]
+    ages = (last_train_date - neighbor_dates).days.astype(float)
+
+    weights = np.exp(-ages / decay_days)
+    neighbor_labels = train_y[indices]
+
+    prob_up = float(np.sum(weights * neighbor_labels) / np.sum(weights))
+    return prob_up
 
 
 def generate_signal(
@@ -226,36 +295,40 @@ def generate_signal(
         Signal recommendation dictionary.
     """
     if prepared_data is not None:
-        train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler = prepared_data
+        train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler, train_dates = prepared_data
     else:
-        train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler = \
+        train_X_scaled, train_y, today_X_scaled, today_row, today_date, scaler, train_dates = \
             _prepare_training_data(model_config)
 
     features = model_config["features"]
 
-    # Fit KNN
-    knn = KNeighborsClassifier(
-        n_neighbors=model_config["k"],
-        metric=model_config["metric"],
-        weights=model_config["weights"],
-    )
-    knn.fit(train_X_scaled, train_y)
-    knn_proba = knn.predict_proba(today_X_scaled)[0]
-    knn_prob_up = float(knn_proba[1] if len(knn_proba) > 1 else knn_proba[0])
+    # Multi-K ensemble with recency weighting
+    per_k_probs = {}
+    for k in ENSEMBLE_KS:
+        knn = KNeighborsClassifier(
+            n_neighbors=k,
+            metric=model_config["metric"],
+            weights="uniform",
+        )
+        knn.fit(train_X_scaled, train_y)
+        prob = _recency_weighted_knn_proba(knn, today_X_scaled, train_y, train_dates)
+        per_k_probs[k] = prob
+
+    knn_prob_up = float(np.mean(list(per_k_probs.values())))
 
     if model_version == "v1":
-        # V1: KNN 70% + LR 30% blend
+        # V1: KNN ensemble 70% + LR 30% blend
         lr = LogisticRegression(max_iter=1000, C=1.0, random_state=42)
         lr.fit(train_X_scaled, train_y)
         lr_proba = lr.predict_proba(today_X_scaled)[0]
         lr_prob_up = float(lr_proba[1] if len(lr_proba) > 1 else lr_proba[0])
         prob_up = 0.7 * knn_prob_up + 0.3 * lr_prob_up
-        version_label = "V1 (KNN 70% + LR 30%)"
+        version_label = "V1 (KNN ensemble 70% + LR 30%)"
     else:
-        # V2: KNN only
+        # V2: KNN ensemble only
         prob_up = knn_prob_up
         lr_prob_up = None
-        version_label = "V2 (KNN only)"
+        version_label = "V2 (KNN ensemble only)"
 
     prediction = 1 if prob_up > 0.5 else 0
 
@@ -287,9 +360,10 @@ def generate_signal(
         "lr_prob_up": round(float(lr_prob_up), 4) if lr_prob_up is not None else None,
         "recommendation": recommendation,
         "model_details": {
-            "k": model_config["k"],
+            "ensemble_k_values": ENSEMBLE_KS,
+            "per_k_probs": {str(k): round(p, 4) for k, p in per_k_probs.items()},
+            "recency_decay_days": 180,
             "metric": model_config["metric"],
-            "weights": model_config["weights"],
             "training_window": model_config["training_window"],
             "features_used": features,
             "blend_weights": {"knn": 0.7, "lr": 0.3} if model_version == "v1" else {"knn": 1.0},
@@ -323,8 +397,13 @@ def print_signal(signal: dict) -> None:
     print(f"  Date:           {signal['date']}")
     print(f"  QQQ Close:      ${signal['prices']['qqq_close']:.2f}")
     print(f"  QQQ Prediction: {signal['prediction']} (P(up) = {prob:.1%})")
+    # Show per-K ensemble breakdown
+    per_k = signal.get("model_details", {}).get("per_k_probs", {})
+    if per_k:
+        k_str = "  ".join(f"K={k}:{float(p):.1%}" for k, p in per_k.items())
+        print(f"    KNN ensemble: {k_str}")
+        print(f"    KNN avg:      {signal['knn_prob_up']:.1%}")
     if signal.get("lr_prob_up") is not None:
-        print(f"    KNN P(up):    {signal['knn_prob_up']:.1%}")
         print(f"    LR P(up):     {signal['lr_prob_up']:.1%}")
         print(f"    Blended:      {prob:.1%}")
     print()
@@ -597,8 +676,8 @@ if __name__ == "__main__":
         versions = ["v1"]  # default
 
     print("KNN QQQ Trading Model — Daily Signal Generator")
-    print(f"Model: K={model_config['k']}, {model_config['metric']}, "
-          f"window={model_config['training_window']}")
+    print(f"Model: K={ENSEMBLE_KS} ensemble, {model_config['metric']}, "
+          f"window={model_config['training_window']}, recency decay=180d")
     print(f"Running: {', '.join(v.upper() for v in versions)}\n")
 
     signals_dir = PROJECT_ROOT / "signals" / "daily_recommendations"

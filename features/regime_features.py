@@ -1,7 +1,8 @@
-"""Regime detection features: trend state, SMA cross, ADX, bear persistence."""
+"""Regime detection features: trend state, SMA cross, ADX, bear persistence, VIX regime, trend strength."""
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import ta
 
@@ -44,6 +45,23 @@ def compute_regime_features(df: pd.DataFrame) -> pd.DataFrame:
     days_below = below_sma200.groupby(group_id).cumsum()
     df["feat_days_below_sma200"] = days_below.clip(upper=60).astype(float)
 
+    # 5. VIX percentile rank within rolling 60-day window (0-1)
+    if "VIX_Close" in df.columns:
+        vix = df["VIX_Close"]
+        df["feat_vix_percentile_60d"] = vix.rolling(60).apply(
+            lambda x: (x.iloc[-1] >= x).sum() / len(x), raw=False
+        )
+    else:
+        df["feat_vix_percentile_60d"] = np.nan
+
+    # 6. Trend strength: 20-day linear regression slope normalized by price
+    def _trend_slope(window):
+        x = np.arange(len(window))
+        slope = np.polyfit(x, window, 1)[0]
+        return slope / window.iloc[-1]
+
+    df["feat_trend_strength_20d"] = close.rolling(20).apply(_trend_slope, raw=False)
+
     return df
 
 
@@ -59,6 +77,8 @@ def save_regime_features(df: pd.DataFrame, output_path: Path) -> None:
         "feat_golden_cross",
         "feat_adx_14",
         "feat_days_below_sma200",
+        "feat_vix_percentile_60d",
+        "feat_trend_strength_20d",
     ]
     feat_df = df[regime_cols].copy()
 
