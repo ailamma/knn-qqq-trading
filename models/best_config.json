@@ -15,9 +15,7 @@
     "feat_daily_return",
     "feat_rsi_14",
     "feat_stoch_d",
-    "feat_stoch_k",
-    "feat_vix_percentile_60d",
-    "feat_trend_strength_20d"
+    "feat_stoch_k"
   ],
   "confidence_threshold": 0.58
 }

@@ -1,13 +1,13 @@
 """Daily signal generation: run at EOD to generate next-day TQQQ/SQQQ recommendation.
 
 Two model versions available:
-  V1 (ensemble): KNN 70% + Logistic Regression 30% blend — higher Sharpe (1.30), smoother
-  V2 (knn-only): KNN only — higher total return, better in bear markets
+  V1 (backtested): Multi-K ensemble [11,15,21], uniform weighting — backtested +160%, Sharpe 0.66
+  V2 (recency):    Multi-K ensemble [11,15,21] + recency weighting (180d decay) — regime-adaptive
 
 Usage:
-  python signals/generate_daily_signal.py          # default (V1 ensemble)
-  python signals/generate_daily_signal.py --v1     # V1 ensemble
-  python signals/generate_daily_signal.py --v2     # V2 KNN-only
+  python signals/generate_daily_signal.py          # default (--both)
+  python signals/generate_daily_signal.py --v1     # V1 backtested only
+  python signals/generate_daily_signal.py --v2     # V2 recency only
   python signals/generate_daily_signal.py --both   # run both, show comparison
 """
 
@@ -22,7 +22,6 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 
 # Add project root to path
@@ -277,6 +276,9 @@ def _recency_weighted_knn_proba(
     return prob_up
 
 
+RECENCY_DECAY_DAYS = 180
+
+
 def generate_signal(
     model_config: dict,
     account_balance: float = 50000.0,
@@ -288,7 +290,7 @@ def generate_signal(
     Args:
         model_config: KNN model configuration.
         account_balance: Current account balance.
-        model_version: "v1" (KNN+LR ensemble) or "v2" (KNN only).
+        model_version: "v1" (multi-K ensemble, no recency) or "v2" (multi-K + recency).
         prepared_data: Pre-computed training data tuple to avoid re-downloading.
 
     Returns:
@@ -301,8 +303,9 @@ def generate_signal(
             _prepare_training_data(model_config)
 
     features = model_config["features"]
+    use_recency = model_version == "v2"
 
-    # Multi-K ensemble with recency weighting
+    # Multi-K ensemble
     per_k_probs = {}
     for k in ENSEMBLE_KS:
         knn = KNeighborsClassifier(
@@ -311,24 +314,23 @@ def generate_signal(
             weights="uniform",
         )
         knn.fit(train_X_scaled, train_y)
-        prob = _recency_weighted_knn_proba(knn, today_X_scaled, train_y, train_dates)
+
+        if use_recency:
+            prob = _recency_weighted_knn_proba(
+                knn, today_X_scaled, train_y, train_dates, RECENCY_DECAY_DAYS
+            )
+        else:
+            proba = knn.predict_proba(today_X_scaled)[0]
+            prob = float(proba[1] if len(proba) > 1 else proba[0])
+
         per_k_probs[k] = prob
 
-    knn_prob_up = float(np.mean(list(per_k_probs.values())))
+    prob_up = float(np.mean(list(per_k_probs.values())))
 
     if model_version == "v1":
-        # V1: KNN ensemble 70% + LR 30% blend
-        lr = LogisticRegression(max_iter=1000, C=1.0, random_state=42)
-        lr.fit(train_X_scaled, train_y)
-        lr_proba = lr.predict_proba(today_X_scaled)[0]
-        lr_prob_up = float(lr_proba[1] if len(lr_proba) > 1 else lr_proba[0])
-        prob_up = 0.7 * knn_prob_up + 0.3 * lr_prob_up
-        version_label = "V1 (KNN ensemble 70% + LR 30%)"
+        version_label = "V1 (multi-K ensemble, backtested)"
     else:
-        # V2: KNN ensemble only
-        prob_up = knn_prob_up
-        lr_prob_up = None
-        version_label = "V2 (KNN ensemble only)"
+        version_label = "V2 (multi-K ensemble + recency 180d)"
 
     prediction = 1 if prob_up > 0.5 else 0
 
@@ -356,17 +358,16 @@ def generate_signal(
         "model_version_label": version_label,
         "prediction": "UP" if prediction == 1 else "DOWN",
         "prob_up": round(float(prob_up), 4),
-        "knn_prob_up": round(float(knn_prob_up), 4),
-        "lr_prob_up": round(float(lr_prob_up), 4) if lr_prob_up is not None else None,
+        "knn_prob_up": round(float(prob_up), 4),
+        "lr_prob_up": None,
         "recommendation": recommendation,
         "model_details": {
             "ensemble_k_values": ENSEMBLE_KS,
             "per_k_probs": {str(k): round(p, 4) for k, p in per_k_probs.items()},
-            "recency_decay_days": 180,
+            "recency_decay_days": RECENCY_DECAY_DAYS if use_recency else None,
             "metric": model_config["metric"],
             "training_window": model_config["training_window"],
             "features_used": features,
-            "blend_weights": {"knn": 0.7, "lr": 0.3} if model_version == "v1" else {"knn": 1.0},
         },
         "prices": {
             "qqq_close": round(float(today_row["Close"]), 2),
@@ -402,10 +403,9 @@ def print_signal(signal: dict) -> None:
     if per_k:
         k_str = "  ".join(f"K={k}:{float(p):.1%}" for k, p in per_k.items())
         print(f"    KNN ensemble: {k_str}")
-        print(f"    KNN avg:      {signal['knn_prob_up']:.1%}")
-    if signal.get("lr_prob_up") is not None:
-        print(f"    LR P(up):     {signal['lr_prob_up']:.1%}")
-        print(f"    Blended:      {prob:.1%}")
+    recency = signal.get("model_details", {}).get("recency_decay_days")
+    if recency:
+        print(f"    Recency:      decay={recency}d")
     print()
     print(f"  ┌─────────────────────────────────────────────────┐")
 
@@ -659,25 +659,26 @@ def _print_scorecard() -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="KNN QQQ Trading Model — Daily Signal Generator")
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("--v1", action="store_true", help="V1: KNN+LR ensemble (default)")
-    group.add_argument("--v2", action="store_true", help="V2: KNN only")
-    group.add_argument("--both", action="store_true", help="Run both models and compare")
+    group.add_argument("--v1", action="store_true", help="V1: multi-K ensemble (backtested)")
+    group.add_argument("--v2", action="store_true", help="V2: multi-K + recency weighting")
+    group.add_argument("--both", action="store_true", help="Run both models and compare (default)")
     parser.add_argument("--balance", type=float, default=50000.0, help="Account balance (default: 50000)")
     args = parser.parse_args()
 
     model_config = load_config()
 
-    if args.both:
-        # Run both versions
-        versions = ["v1", "v2"]
+    if args.v1:
+        versions = ["v1"]
     elif args.v2:
         versions = ["v2"]
     else:
-        versions = ["v1"]  # default
+        versions = ["v1", "v2"]  # default: run both
 
     print("KNN QQQ Trading Model — Daily Signal Generator")
     print(f"Model: K={ENSEMBLE_KS} ensemble, {model_config['metric']}, "
-          f"window={model_config['training_window']}, recency decay=180d")
+          f"window={model_config['training_window']}")
+    print(f"  V1: uniform weighting (backtested +160%, Sharpe 0.66)")
+    print(f"  V2: recency weighting (decay={RECENCY_DECAY_DAYS}d, regime-adaptive)")
     print(f"Running: {', '.join(v.upper() for v in versions)}\n")
 
     signals_dir = PROJECT_ROOT / "signals" / "daily_recommendations"
@@ -705,7 +706,7 @@ if __name__ == "__main__":
         print_signal(signal)
         print(f"  Signal saved to {signal_path}")
 
-    if args.both and len(versions) == 2:
+    if len(versions) == 2:
         print("\n" + "=" * 60)
         print("       MODEL COMPARISON")
         print("=" * 60)
@@ -720,8 +721,8 @@ if __name__ == "__main__":
             v1r = v1["recommendation"]
             v2r = v2["recommendation"]
             agree = v1["prediction"] == v2["prediction"]
-            print(f"  V1 (ensemble): {v1['prediction']} P(up)={v1['prob_up']:.1%} → {v1r['leverage_level']:+d}% leverage")
-            print(f"  V2 (KNN-only): {v2['prediction']} P(up)={v2['prob_up']:.1%} → {v2r['leverage_level']:+d}% leverage")
+            print(f"  V1 (backtested): {v1['prediction']} P(up)={v1['prob_up']:.1%} → {v1r['leverage_level']:+d}% leverage")
+            print(f"  V2 (recency):    {v2['prediction']} P(up)={v2['prob_up']:.1%} → {v2r['leverage_level']:+d}% leverage")
             print(f"  Models {'AGREE' if agree else 'DISAGREE'}")
         print("=" * 60)
 

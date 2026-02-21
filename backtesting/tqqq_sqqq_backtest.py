@@ -298,15 +298,19 @@ if __name__ == "__main__":
 
     print(f"Features: {len(df)} rows")
     print(f"TQQQ: {len(tqqq)} rows, SQQQ: {len(sqqq)} rows")
-    print(f"Config: K={config['k']}, metric={config['metric']}, window={config['training_window']}")
+    from models.knn_model import ENSEMBLE_KS
 
-    # Run walk-forward predictions
-    print("\nRunning walk-forward predictions...")
+    print(f"Config: K={ENSEMBLE_KS} ensemble, metric={config['metric']}, window={config['training_window']}")
+
+    # Run walk-forward predictions with multi-K ensemble (V1: no recency weighting)
+    print("\nRunning walk-forward predictions (multi-K ensemble, no recency)...")
     predictions = run_walk_forward_backtest(
         df, feature_cols=config["features"],
-        k=config["k"], metric=config["metric"], weights=config["weights"],
+        metric=config["metric"], weights=config["weights"],
         training_window=config["training_window"],
         start_date="2020-01-01", end_date="2025-12-31",
+        ensemble_ks=ENSEMBLE_KS,
+        recency_decay_days=0,
     )
 
     # Run TQQQ/SQQQ backtest with discrete leverage + vol targeting

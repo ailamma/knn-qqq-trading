@@ -21,6 +21,36 @@ BASELINE_FEATURES = [
 ]
 
 
+ENSEMBLE_KS = [11, 15, 21]
+RECENCY_DECAY_DAYS = 180
+
+
+def _recency_weighted_proba(knn, X_test, y_train, train_dates, decay_days=RECENCY_DECAY_DAYS):
+    """Compute recency-weighted P(up) from KNN neighbors.
+
+    Args:
+        knn: Fitted KNeighborsClassifier.
+        X_test: Test feature vector (1, n_features).
+        y_train: Training labels.
+        train_dates: DatetimeIndex of training rows.
+        decay_days: Exponential decay half-life in days.
+
+    Returns:
+        Recency-weighted probability of UP.
+    """
+    distances, indices = knn.kneighbors(X_test)
+    indices = indices[0]
+
+    neighbor_dates = train_dates[indices]
+    last_train_date = train_dates[-1]
+    ages = (last_train_date - neighbor_dates).days.astype(float)
+
+    weights = np.exp(-ages / decay_days)
+    neighbor_labels = y_train[indices]
+
+    return float(np.sum(weights * neighbor_labels) / np.sum(weights))
+
+
 def run_walk_forward_backtest(
     df: pd.DataFrame,
     feature_cols: list[str] | None = None,
@@ -31,28 +61,39 @@ def run_walk_forward_backtest(
     start_date: str | None = None,
     end_date: str | None = None,
     verbose: bool = True,
+    ensemble_ks: list[int] | None = None,
+    recency_decay_days: int = RECENCY_DECAY_DAYS,
 ) -> pd.DataFrame:
     """Run walk-forward backtest with KNN classifier.
 
     For each test day, fits a fresh KNN on the trailing training window,
     scales features using only training data, and predicts the test day.
 
+    When ensemble_ks is provided, fits multiple KNNs and averages their
+    recency-weighted probabilities.
+
     Args:
         df: Features master DataFrame with target column.
         feature_cols: List of feature column names. Defaults to BASELINE_FEATURES.
-        k: Number of neighbors.
+        k: Number of neighbors (used when ensemble_ks is None).
         metric: Distance metric.
         weights: Weight function (uniform or distance).
         training_window: Number of training days.
         start_date: Start date for test predictions.
         end_date: End date for test predictions.
         verbose: Print progress updates.
+        ensemble_ks: List of K values for multi-K ensemble. None = single K.
+        recency_decay_days: Decay for recency weighting. 0 = no recency weighting.
 
     Returns:
         DataFrame with columns: date, prediction, actual, probability, correct.
     """
     if feature_cols is None:
         feature_cols = BASELINE_FEATURES
+
+    use_ensemble = ensemble_ks is not None and len(ensemble_ks) > 1
+    use_recency = recency_decay_days > 0
+    k_values = ensemble_ks if use_ensemble else [k]
 
     X = df[feature_cols].values
     y = df["target"].values
@@ -72,22 +113,31 @@ def run_walk_forward_backtest(
 
         y_train = y[train_idx]
         y_test = y[test_idx]
+        train_dates = dates[train_idx]
 
-        # Fit KNN
-        knn = KNeighborsClassifier(n_neighbors=k, metric=metric, weights=weights)
-        knn.fit(X_train, y_train)
+        # Multi-K ensemble with optional recency weighting
+        k_probs = []
+        for kv in k_values:
+            knn = KNeighborsClassifier(n_neighbors=kv, metric=metric, weights="uniform")
+            knn.fit(X_train, y_train)
 
-        # Predict
-        pred = knn.predict(X_test)[0]
-        proba = knn.predict_proba(X_test)[0]
-        # Probability of predicted class being "up" (class 1)
-        prob_up = proba[1] if len(proba) > 1 else proba[0]
+            if use_recency:
+                prob_up = _recency_weighted_proba(
+                    knn, X_test, y_train, train_dates, recency_decay_days
+                )
+            else:
+                proba = knn.predict_proba(X_test)[0]
+                prob_up = float(proba[1] if len(proba) > 1 else proba[0])
+            k_probs.append(prob_up)
+
+        prob_up = float(np.mean(k_probs))
+        pred = 1 if prob_up > 0.5 else 0
 
         results.append({
             "date": dates[test_idx[0]],
             "prediction": int(pred),
             "actual": int(y_test[0]),
-            "prob_up": float(prob_up),
+            "prob_up": prob_up,
             "correct": int(pred == y_test[0]),
             "actual_return": float(df["next_day_return"].iloc[test_idx[0]]),
         })

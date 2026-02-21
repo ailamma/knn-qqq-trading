@@ -1,5 +1,5 @@
 {
-  "total_features": 45,
+  "total_features": 47,
   "total_rows": 4860,
   "date_range": {
     "start": "2006-10-18",
@@ -320,6 +320,20 @@
       "std": 15.990322,
       "min": 0.0,
       "max": 60.0
+    },
+    {
+      "name": "feat_vix_percentile_60d",
+      "mean": 0.463741,
+      "std": 0.327666,
+      "min": 0.016667,
+      "max": 1.0
+    },
+    {
+      "name": "feat_trend_strength_20d",
+      "mean": 0.000479,
+      "std": 0.003077,
+      "min": -0.02067,
+      "max": 0.009561
     }
   ]
 }
