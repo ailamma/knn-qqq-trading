@@ -9,7 +9,7 @@ def compute_cross_asset_features(df: pd.DataFrame) -> pd.DataFrame:
     """Compute cross-asset features from auxiliary ticker data.
 
     Args:
-        df: Master dataset with QQQ, SPY, IWM, TLT, GLD columns.
+        df: Master dataset with QQQ, SPY, IWM, TLT, GLD, SMH, HYG, UUP columns.
 
     Returns:
         DataFrame with cross-asset feature columns added.
@@ -39,6 +39,28 @@ def compute_cross_asset_features(df: pd.DataFrame) -> pd.DataFrame:
     qqq_ret_5d = qqq_close.pct_change(5)
     df["feat_spy_qqq_spread_5d"] = spy_ret_5d - qqq_ret_5d
 
+    # --- Macro proxy features ---
+
+    # SMH/QQQ relative strength (AI/semiconductor momentum)
+    if "SMH_Close" in df.columns:
+        smh_close = df["SMH_Close"]
+        smh_qqq_ratio = smh_close / qqq_close
+        df["feat_smh_qqq_rs_10d"] = smh_qqq_ratio.pct_change(10)
+        df["feat_smh_return_5d"] = smh_close.pct_change(5)
+
+    # HYG/TLT spread (credit risk / risk appetite)
+    if "HYG_Close" in df.columns:
+        hyg_close = df["HYG_Close"]
+        hyg_ret_5d = hyg_close.pct_change(5)
+        tlt_ret_5d = tlt_close.pct_change(5)
+        df["feat_hyg_tlt_spread_5d"] = hyg_ret_5d - tlt_ret_5d
+
+    # UUP returns (dollar strength / tariff proxy)
+    if "UUP_Close" in df.columns:
+        uup_close = df["UUP_Close"]
+        df["feat_uup_return_5d"] = uup_close.pct_change(5)
+        df["feat_uup_return_10d"] = uup_close.pct_change(10)
+
     return df
 
 
@@ -52,7 +74,12 @@ def save_cross_asset_features(df: pd.DataFrame, output_path: Path) -> None:
     ca_cols = [
         "feat_qqq_spy_rs_10d", "feat_qqq_iwm_rs_10d",
         "feat_tlt_return_5d", "feat_gld_return_5d", "feat_spy_qqq_spread_5d",
+        "feat_smh_qqq_rs_10d", "feat_smh_return_5d",
+        "feat_hyg_tlt_spread_5d",
+        "feat_uup_return_5d", "feat_uup_return_10d",
     ]
+    # Only include columns that exist (in case tickers aren't downloaded yet)
+    ca_cols = [c for c in ca_cols if c in df.columns]
     feat_df = df[ca_cols].copy()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

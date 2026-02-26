@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from sklearn.feature_selection import mutual_info_classif
 
-from models.knn_model import run_walk_forward_backtest, compute_metrics
+from models.knn_model import run_walk_forward_backtest, compute_metrics, ENSEMBLE_KS
 
 
 ALL_FEATURES = [
@@ -30,6 +30,10 @@ ALL_FEATURES = [
     # Cross-asset features
     "feat_qqq_spy_rs_10d", "feat_qqq_iwm_rs_10d",
     "feat_tlt_return_5d", "feat_gld_return_5d", "feat_spy_qqq_spread_5d",
+    # Macro proxy features
+    "feat_smh_qqq_rs_10d", "feat_smh_return_5d",
+    "feat_hyg_tlt_spread_5d",
+    "feat_uup_return_5d", "feat_uup_return_10d",
     # Calendar features
     "feat_day_of_week", "feat_month", "feat_is_opex_week", "feat_days_since_fomc",
     # Regime features
@@ -111,6 +115,7 @@ def forward_feature_selection(
                     df, feature_cols=trial, k=k, metric=metric, weights=weights,
                     training_window=training_window, start_date=start_date,
                     end_date=end_date, verbose=False,
+                    ensemble_ks=ENSEMBLE_KS, recency_decay_days=0,
                 )
                 metrics = compute_metrics(results)
                 sharpe = metrics["sharpe_ratio"]
@@ -173,7 +178,7 @@ def compare_feature_sets(
         results = run_walk_forward_backtest(
             df, feature_cols=features, k=k, metric=metric, weights=weights,
             training_window=500, start_date="2020-01-01", end_date="2025-12-31",
-            verbose=False,
+            verbose=False, ensemble_ks=ENSEMBLE_KS, recency_decay_days=0,
         )
         metrics = compute_metrics(results)
         metrics["set_name"] = name
@@ -188,11 +193,17 @@ if __name__ == "__main__":
     features_path = project_root / "data" / "processed" / "features_master.csv"
 
     df = pd.read_csv(features_path, index_col=0, parse_dates=True)
-    print(f"Loaded features: {len(df)} rows, {len(ALL_FEATURES)} candidate features")
+
+    # Filter ALL_FEATURES to only those present in the data
+    available_features = [f for f in ALL_FEATURES if f in df.columns]
+    missing = [f for f in ALL_FEATURES if f not in df.columns]
+    if missing:
+        print(f"Skipping {len(missing)} features not in data: {missing}")
+    print(f"Loaded features: {len(df)} rows, {len(available_features)} candidate features")
 
     # Step 1: Mutual information ranking as pre-filter
     print("\n=== Mutual Information Ranking ===")
-    mi_ranking = mutual_info_ranking(df, ALL_FEATURES)
+    mi_ranking = mutual_info_ranking(df, available_features)
     print(mi_ranking.to_string(index=False))
 
     # Use top 20 by MI as candidates for forward selection (reduces search space)
@@ -217,7 +228,7 @@ if __name__ == "__main__":
         "manual_5": MANUAL_5,
         "top_8": top_8,
         "top_12": top_12,
-        "all_39": ALL_FEATURES,
+        "all_available": available_features,
     })
 
     print("\n" + comparison[["set_name", "n_features", "sharpe_ratio", "accuracy",

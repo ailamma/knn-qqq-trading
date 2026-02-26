@@ -12,6 +12,9 @@ TICKER_FILES = {
     "IWM": "iwm_daily.csv",
     "TLT": "tlt_daily.csv",
     "GLD": "gld_daily.csv",
+    "SMH": "smh_daily.csv",
+    "HYG": "hyg_daily.csv",
+    "UUP": "uup_daily.csv",
 }
 
 

@@ -56,6 +56,9 @@ TICKER_MAP = {
     "IWM": ("IWM", "iwm_daily.csv"),
     "TLT": ("TLT", "tlt_daily.csv"),
     "GLD": ("GLD", "gld_daily.csv"),
+    "SMH": ("SMH", "smh_daily.csv"),
+    "HYG": ("HYG", "hyg_daily.csv"),
+    "UUP": ("UUP", "uup_daily.csv"),
 }
 
 KEEP_COLS = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
@@ -168,7 +171,7 @@ def download_fresh_data() -> pd.DataFrame:
 
     # Inner join
     master = dfs["QQQ"]
-    for key in ["^VIX", "SPY", "IWM", "TLT", "GLD"]:
+    for key in ["^VIX", "SPY", "IWM", "TLT", "GLD", "SMH", "HYG", "UUP"]:
         master = master.join(dfs[key], how="inner")
 
     return master
