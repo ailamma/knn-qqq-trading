@@ -1,6 +1,6 @@
 {
   "date": "2026-03-04",
-  "generated_at": "2026-03-04T22:28:34.038263",
+  "generated_at": "2026-03-05T12:23:51.097831",
   "model_version": "v2",
   "model_version_label": "V2 (multi-K ensemble + recency 180d)",
   "prediction": "DOWN",
@@ -12,7 +12,7 @@
     "raw_leverage": -200,
     "vol_adjusted": true,
     "ticker": "SQQQ",
-    "shares": 237,
+    "shares": 232,
     "tqqq_allocation": 0.0,
     "sqqq_allocation": 0.33,
     "cash_allocation": 0.67,
@@ -49,8 +49,8 @@
   },
   "prices": {
     "qqq_close": 610.75,
-    "tqqq_close": 50.26,
-    "sqqq_close": 69.62
+    "tqqq_close": 49.29,
+    "sqqq_close": 70.94
   },
   "account_balance": 50000.0
 }
