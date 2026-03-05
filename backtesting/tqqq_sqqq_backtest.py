@@ -126,6 +126,7 @@ def run_tqqq_sqqq_backtest(
     features_df: pd.DataFrame | None = None,
     qqq: pd.DataFrame | None = None,
     stop_type: str | None = None,
+    pct_stop_loss: float | None = None,
     initial_capital: float = 50000.0,
 ) -> pd.DataFrame:
     """Simulate TQQQ/SQQQ trading with discrete leverage levels.
@@ -138,6 +139,8 @@ def run_tqqq_sqqq_backtest(
         features_df: Features master for realized vol lookup. Optional.
         qqq: QQQ daily price data. Required if stop_type is set.
         stop_type: Stop loss type: "two_day", "prev_day", "pivot", or None.
+        pct_stop_loss: Percentage stop loss on leveraged ETF (e.g. 0.02 for 2%).
+            Entry is signal day close; stop monitors next day's low.
         initial_capital: Starting account balance.
 
     Returns:
@@ -190,7 +193,7 @@ def run_tqqq_sqqq_backtest(
         ticker = rec["ticker"]
         shares = rec["shares"]
 
-        # Check stop loss on next day
+        # Check structural stop loss on next day
         was_stopped = False
         if stop_levels is not None and shares > 0:
             next_date = tqqq.index[tqqq_idx + 1]
@@ -200,7 +203,6 @@ def run_tqqq_sqqq_backtest(
                 if ticker == "TQQQ" and leverage > 0:
                     long_stop = stop_levels.loc[date, "long_stop"]
                     if not pd.isna(long_stop) and qqq_next["Low"] <= long_stop:
-                        # Stop triggered — estimate exit price
                         exit_price = _estimate_stop_exit_price(
                             entry_price=tqqq_price,
                             qqq_close=qqq.loc[date, "Close"],
@@ -231,6 +233,34 @@ def run_tqqq_sqqq_backtest(
                         sqqq_next_close = exit_price
                         was_stopped = True
                         stop_count += 1
+
+        # Check percentage-based stop loss (entry = signal day close)
+        if pct_stop_loss is not None and shares > 0 and not was_stopped:
+            stop_level_pct = 1 - pct_stop_loss  # e.g., 0.98 for 2% stop
+
+            if ticker == "TQQQ" and leverage > 0:
+                entry = tqqq_price
+                stop_price = entry * stop_level_pct
+                next_row = tqqq.iloc[tqqq_idx + 1]
+                if next_row["Low"] <= stop_price:
+                    if next_row["Open"] <= stop_price:
+                        tqqq_next_close = next_row["Open"]
+                    else:
+                        tqqq_next_close = stop_price * 0.995
+                    was_stopped = True
+                    stop_count += 1
+
+            elif ticker == "SQQQ" and leverage < 0:
+                entry = sqqq_price
+                stop_price = entry * stop_level_pct
+                next_row = sqqq.iloc[sqqq_idx + 1]
+                if next_row["Low"] <= stop_price:
+                    if next_row["Open"] <= stop_price:
+                        sqqq_next_close = next_row["Open"]
+                    else:
+                        sqqq_next_close = stop_price * 0.995
+                    was_stopped = True
+                    stop_count += 1
 
         # Calculate P&L based on allocation
         if ticker == "TQQQ" and shares > 0:
@@ -295,16 +325,19 @@ if __name__ == "__main__":
     features_path = project_root / "data" / "processed" / "features_master.csv"
     df = pd.read_csv(features_path, index_col=0, parse_dates=True)
     tqqq, sqqq = load_leveraged_prices(project_root / "data" / "raw")
+    qqq = pd.read_csv(project_root / "data" / "raw" / "qqq_daily.csv",
+                       index_col=0, parse_dates=True)
 
     print(f"Features: {len(df)} rows")
     print(f"TQQQ: {len(tqqq)} rows, SQQQ: {len(sqqq)} rows")
     from models.knn_model import ENSEMBLE_KS
+    from signals.position_sizer import V3_THRESHOLDS
 
     print(f"Config: K={ENSEMBLE_KS} ensemble, metric={config['metric']}, window={config['training_window']}")
 
-    # Run walk-forward predictions with multi-K ensemble (V1: no recency weighting)
-    print("\nRunning walk-forward predictions (multi-K ensemble, no recency)...")
-    predictions = run_walk_forward_backtest(
+    # ── Walk-forward predictions (V1/V3: no recency) ──
+    print("\n[1/3] Walk-forward predictions (no recency)...")
+    preds_no_recency = run_walk_forward_backtest(
         df, feature_cols=config["features"],
         metric=config["metric"], weights=config["weights"],
         training_window=config["training_window"],
@@ -313,41 +346,98 @@ if __name__ == "__main__":
         recency_decay_days=0,
     )
 
-    # Run TQQQ/SQQQ backtest with discrete leverage + vol targeting
-    print("\nRunning TQQQ/SQQQ backtest (7 leverage levels, vol targeting)...")
-    sizer = PositionSizer(vol_target_multiple=1.0)
-    trade_log = run_tqqq_sqqq_backtest(predictions, tqqq, sqqq, sizer, features_df=df)
+    # ── Walk-forward predictions (V2: recency weighted) ──
+    print("\n[2/3] Walk-forward predictions (recency 180d)...")
+    preds_recency = run_walk_forward_backtest(
+        df, feature_cols=config["features"],
+        metric=config["metric"], weights=config["weights"],
+        training_window=config["training_window"],
+        start_date="2020-01-01", end_date="2025-12-31",
+        ensemble_ks=ENSEMBLE_KS,
+        recency_decay_days=180,
+    )
 
-    # Compute metrics
-    metrics = compute_full_metrics(trade_log)
-    print_full_metrics(metrics)
+    # ── Run backtests ──
+    print("\n[3/3] Running TQQQ/SQQQ backtests...")
 
-    # Leverage distribution
-    if "leverage_level" in trade_log.columns:
-        print("\n=== Leverage Distribution ===")
-        lev_dist = trade_log["leverage_level"].value_counts().sort_index()
-        for lev, count in lev_dist.items():
-            pct = count / len(trade_log) * 100
-            print(f"  {lev:+4d}%: {count:5d} days ({pct:5.1f}%)")
+    # V1: default thresholds, no stop, no recency
+    sizer_v1 = PositionSizer(vol_target_multiple=1.0)
+    log_v1 = run_tqqq_sqqq_backtest(
+        preds_no_recency, tqqq, sqqq, sizer_v1, features_df=df)
 
-        vol_adj = trade_log["vol_adjusted"].sum()
-        print(f"\n  Vol-adjusted days: {vol_adj} ({vol_adj/len(trade_log)*100:.1f}%)")
+    # V2: default thresholds, no stop, recency weighted
+    sizer_v2 = PositionSizer(vol_target_multiple=1.0)
+    log_v2 = run_tqqq_sqqq_backtest(
+        preds_recency, tqqq, sqqq, sizer_v2, features_df=df)
 
-    # Compare with buy-and-hold
-    overlap_dates = trade_log.index
+    # V3: higher thresholds (65%+), 2% stop loss, no recency
+    sizer_v3 = PositionSizer(thresholds=V3_THRESHOLDS, vol_target_multiple=1.0)
+    print("  V3 (65% threshold + 2% stop):")
+    log_v3 = run_tqqq_sqqq_backtest(
+        preds_no_recency, tqqq, sqqq, sizer_v3, features_df=df,
+        pct_stop_loss=0.02)
+
+    # ── Compute metrics for all three ──
+    metrics_v1 = compute_full_metrics(log_v1)
+    metrics_v2 = compute_full_metrics(log_v2)
+    metrics_v3 = compute_full_metrics(log_v3)
+
+    # ── Comparison table ──
+    print("\n" + "=" * 72)
+    print("V1 vs V2 vs V3 BACKTEST COMPARISON (2020-2025)")
+    print("=" * 72)
+    header = f"{'Metric':<25} {'V1 (baseline)':>15} {'V2 (recency)':>15} {'V3 (65%+stop)':>15}"
+    print(header)
+    print("-" * 72)
+
+    rows = [
+        ("Total Return", "total_return", "{:.2%}"),
+        ("Annual Return", "annual_return", "{:.2%}"),
+        ("Sharpe Ratio", "sharpe_ratio", "{:.2f}"),
+        ("Max Drawdown", "max_drawdown", "{:.2%}"),
+        ("Win Rate", "win_rate", "{:.2%}"),
+        ("Profit Factor", "profit_factor", "{:.2f}"),
+        ("Total Days", "n_days", "{:,.0f}"),
+    ]
+    for label, key, fmt in rows:
+        v1_val = fmt.format(metrics_v1.get(key, 0))
+        v2_val = fmt.format(metrics_v2.get(key, 0))
+        v3_val = fmt.format(metrics_v3.get(key, 0))
+        print(f"  {label:<23} {v1_val:>15} {v2_val:>15} {v3_val:>15}")
+
+    # Trade counts
+    v1_active = len(log_v1[log_v1["signal"] != "CASH"])
+    v2_active = len(log_v2[log_v2["signal"] != "CASH"])
+    v3_active = len(log_v3[log_v3["signal"] != "CASH"])
+    v3_stops = log_v3["was_stopped"].sum()
+    print(f"  {'Active Trades':<23} {v1_active:>15,} {v2_active:>15,} {v3_active:>15,}")
+    print(f"  {'Cash Days':<23} {len(log_v1)-v1_active:>15,} {len(log_v2)-v2_active:>15,} {len(log_v3)-v3_active:>15,}")
+    print(f"  {'Stop Triggers':<23} {'N/A':>15} {'N/A':>15} {v3_stops:>15,}")
+
+    # Buy & hold comparison
+    overlap_dates = log_v1.index
     tqqq_bah = tqqq.loc[overlap_dates[0]:overlap_dates[-1], "Close"]
     tqqq_bah_return = tqqq_bah.iloc[-1] / tqqq_bah.iloc[0] - 1
-    qqq_bah = (1 + trade_log["actual_return"]).prod() - 1
+    qqq_bah = (1 + log_v1["actual_return"]).prod() - 1
 
-    print(f"\n=== Strategy Comparison ===")
-    print(f"  KNN Leverage Strategy:  {metrics['total_return']:.2%}")
-    print(f"  Buy & Hold TQQQ:        {tqqq_bah_return:.2%}")
-    print(f"  Buy & Hold QQQ:         {qqq_bah:.2%}")
+    print(f"\n  {'Buy & Hold QQQ':<23} {qqq_bah:>15.2%}")
+    print(f"  {'Buy & Hold TQQQ':<23} {tqqq_bah_return:>15.2%}")
+    print("=" * 72)
+
+    # V1 detailed metrics
+    print("\n=== V1 Detailed Metrics ===")
+    print_full_metrics(metrics_v1)
 
     # Save results
     results_dir = project_root / "backtesting" / "results" / "tqqq_sqqq_backtest"
     results_dir.mkdir(parents=True, exist_ok=True)
-    trade_log.to_csv(results_dir / "trade_log.csv")
-    with open(results_dir / "metrics.json", "w") as f:
-        json.dump(metrics, f, indent=2)
+    log_v1.to_csv(results_dir / "trade_log_v1.csv")
+    log_v2.to_csv(results_dir / "trade_log_v2.csv")
+    log_v3.to_csv(results_dir / "trade_log_v3.csv")
+    with open(results_dir / "metrics_v1.json", "w") as f:
+        json.dump(metrics_v1, f, indent=2)
+    with open(results_dir / "metrics_v2.json", "w") as f:
+        json.dump(metrics_v2, f, indent=2)
+    with open(results_dir / "metrics_v3.json", "w") as f:
+        json.dump(metrics_v3, f, indent=2)
     print(f"\nResults saved to {results_dir}")

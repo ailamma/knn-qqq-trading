@@ -44,6 +44,17 @@ DEFAULT_THRESHOLDS = [
     (0.00, -300),  # very high confidence bearish
 ]
 
+# V3 thresholds: higher entry bar (65%), wider dead zone
+V3_THRESHOLDS = [
+    (0.85, 300),   # 85%+ → 3x base (100% TQQQ)
+    (0.75, 200),   # 75-84% → 2x base (67% TQQQ)
+    (0.65, 100),   # 65-74% → 1x base (33% TQQQ)
+    (0.35, 0),     # 35-64% → CASH (wider dead zone)
+    (0.25, -100),  # bearish 1x base
+    (0.15, -200),  # bearish 2x base
+    (0.00, -300),  # bearish 3x base
+]
+
 
 class PositionSizer:
     """Maps KNN QQQ predictions to discrete leverage levels.
