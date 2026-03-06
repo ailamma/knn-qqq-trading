@@ -1,0 +1,56 @@
+{
+  "date": "2026-03-06",
+  "generated_at": "2026-03-06T13:05:57.743067",
+  "model_version": "v2",
+  "model_version_label": "V2 (multi-K ensemble + recency 180d)",
+  "prediction": "UP",
+  "prob_up": 0.5081,
+  "knn_prob_up": 0.5081,
+  "lr_prob_up": null,
+  "recommendation": {
+    "leverage_level": 0,
+    "raw_leverage": 0,
+    "vol_adjusted": false,
+    "ticker": null,
+    "shares": 0,
+    "tqqq_allocation": 0.0,
+    "sqqq_allocation": 0.0,
+    "cash_allocation": 1.0,
+    "dollar_amount": 0.0,
+    "action": "HOLD_LEVERAGE",
+    "current_leverage": 0,
+    "prob_up": 0.5081,
+    "realized_vol": 0.1751
+  },
+  "model_details": {
+    "ensemble_k_values": [
+      11,
+      15,
+      21
+    ],
+    "per_k_probs": {
+      "11": 0.3648,
+      "15": 0.4984,
+      "21": 0.661
+    },
+    "recency_decay_days": 180,
+    "metric": "manhattan",
+    "training_window": 750,
+    "features_used": [
+      "feat_macd_hist",
+      "feat_close_position",
+      "feat_return_5d",
+      "feat_williams_r",
+      "feat_daily_return",
+      "feat_rsi_14",
+      "feat_stoch_d",
+      "feat_stoch_k"
+    ]
+  },
+  "prices": {
+    "qqq_close": 599.75,
+    "tqqq_close": 47.54,
+    "sqqq_close": 73.46
+  },
+  "account_balance": 50000.0
+}
