@@ -1,6 +1,6 @@
 {
   "date": "2026-03-09",
-  "generated_at": "2026-03-09T13:01:22.775310",
+  "generated_at": "2026-03-10T12:47:28.926945",
   "model_version": "v1",
   "model_version_label": "V1 (multi-K ensemble, backtested)",
   "prediction": "UP",
@@ -49,8 +49,8 @@
   },
   "prices": {
     "qqq_close": 607.76,
-    "tqqq_close": 49.4,
-    "sqqq_close": 70.6
+    "tqqq_close": 49.38,
+    "sqqq_close": 70.61
   },
   "account_balance": 50000.0
 }
