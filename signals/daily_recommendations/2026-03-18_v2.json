@@ -1,6 +1,6 @@
 {
   "date": "2026-03-18",
-  "generated_at": "2026-03-18T19:30:30.721464",
+  "generated_at": "2026-03-19T12:37:10.997321",
   "model_version": "v2",
   "model_version_label": "V2 (multi-K ensemble + recency 180d)",
   "prediction": "UP",
@@ -12,7 +12,7 @@
     "raw_leverage": 100,
     "vol_adjusted": false,
     "ticker": "TQQQ",
-    "shares": 357,
+    "shares": 361,
     "tqqq_allocation": 0.33,
     "sqqq_allocation": 0.0,
     "cash_allocation": 0.67,
@@ -49,8 +49,8 @@
   },
   "prices": {
     "qqq_close": 594.9,
-    "tqqq_close": 46.1,
-    "sqqq_close": 75.21
+    "tqqq_close": 45.63,
+    "sqqq_close": 76.0
   },
   "account_balance": 50000.0
 }
