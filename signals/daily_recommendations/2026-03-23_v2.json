@@ -1,0 +1,56 @@
+{
+  "date": "2026-03-23",
+  "generated_at": "2026-03-23T12:04:11.492986",
+  "model_version": "v2",
+  "model_version_label": "V2 (multi-K ensemble + recency 180d)",
+  "prediction": "UP",
+  "prob_up": 0.748,
+  "knn_prob_up": 0.748,
+  "lr_prob_up": null,
+  "recommendation": {
+    "leverage_level": 100,
+    "raw_leverage": 200,
+    "vol_adjusted": true,
+    "ticker": "TQQQ",
+    "shares": 365,
+    "tqqq_allocation": 0.33,
+    "sqqq_allocation": 0.0,
+    "cash_allocation": 0.67,
+    "dollar_amount": 16500.0,
+    "action": "INCREASE_LEVERAGE",
+    "current_leverage": 0,
+    "prob_up": 0.748,
+    "realized_vol": 0.1811
+  },
+  "model_details": {
+    "ensemble_k_values": [
+      11,
+      15,
+      21
+    ],
+    "per_k_probs": {
+      "11": 0.7671,
+      "15": 0.7898,
+      "21": 0.6872
+    },
+    "recency_decay_days": 180,
+    "metric": "manhattan",
+    "training_window": 750,
+    "features_used": [
+      "feat_macd_hist",
+      "feat_close_position",
+      "feat_return_5d",
+      "feat_williams_r",
+      "feat_daily_return",
+      "feat_rsi_14",
+      "feat_stoch_d",
+      "feat_stoch_k"
+    ]
+  },
+  "prices": {
+    "qqq_close": 590.57,
+    "tqqq_close": 45.15,
+    "sqqq_close": 76.44
+  },
+  "account_balance": 50000.0
+}
