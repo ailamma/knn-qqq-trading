@@ -1,0 +1,56 @@
+{
+  "date": "2026-03-25",
+  "generated_at": "2026-03-25T13:26:43.940661",
+  "model_version": "v2",
+  "model_version_label": "V2 (multi-K ensemble + recency 180d)",
+  "prediction": "DOWN",
+  "prob_up": 0.4474,
+  "knn_prob_up": 0.4474,
+  "lr_prob_up": null,
+  "recommendation": {
+    "leverage_level": -100,
+    "raw_leverage": -100,
+    "vol_adjusted": false,
+    "ticker": "SQQQ",
+    "shares": 214,
+    "tqqq_allocation": 0.0,
+    "sqqq_allocation": 0.33,
+    "cash_allocation": 0.67,
+    "dollar_amount": 16500.0,
+    "action": "DECREASE_LEVERAGE",
+    "current_leverage": 0,
+    "prob_up": 0.4474,
+    "realized_vol": 0.1643
+  },
+  "model_details": {
+    "ensemble_k_values": [
+      11,
+      15,
+      21
+    ],
+    "per_k_probs": {
+      "11": 0.4692,
+      "15": 0.4791,
+      "21": 0.3937
+    },
+    "recency_decay_days": 180,
+    "metric": "manhattan",
+    "training_window": 750,
+    "features_used": [
+      "feat_macd_hist",
+      "feat_close_position",
+      "feat_return_5d",
+      "feat_williams_r",
+      "feat_daily_return",
+      "feat_rsi_14",
+      "feat_stoch_d",
+      "feat_stoch_k"
+    ]
+  },
+  "prices": {
+    "qqq_close": 587.82,
+    "tqqq_close": 44.39,
+    "sqqq_close": 76.96
+  },
+  "account_balance": 50000.0
+}
